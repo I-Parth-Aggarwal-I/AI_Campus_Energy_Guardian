@@ -57,6 +57,11 @@ energy-guardian/
 ├── README.md
 
 ```
+## 📸 Screenshots
+
+> 
+
+---
 
 ## 🤝 Team
 
