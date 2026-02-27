@@ -25,7 +25,7 @@
 
 ## 🛠️ Tech Stack
 
-|--------------|--------------------------------------------------|
+
 | Layer        | Technology                                       |
 |--------------|--------------------------------------------------|
 | Frontend     | HTML5, CSS3, Vanilla JavaScript                  |
@@ -33,7 +33,7 @@
 | Fonts        | Google Fonts (Rajdhani, Share Tech Mono, Cinzel) |
 | Charts       | Canvas API (custom)                              |
 | Backend / AI | _(add your stack here)_                          |
-|--------------|--------------------------------------------------|
+
 
 ---
 
@@ -63,13 +63,13 @@ energy-guardian/
 
 ## 🤝 Team
 
-|----------------|-------------|
+
 |      Name      |     Role    |
 |----------------|-------------|
 | Parth Aggarwal | Team Leader |
 | Aryan Bansal   | Team Member |
 | Kundan Sahil   | Team Member |
-|----------------|-------------|
+
 
 ---
 
