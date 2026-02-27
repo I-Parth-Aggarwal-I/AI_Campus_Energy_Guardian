@@ -1,0 +1,2007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Energy Guardian — AI Campus Monitoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+/* ══════════════════════════════════════════════
+   CSS VARIABLES & RESET
+══════════════════════════════════════════════ */
+:root {
+  --orange:   #f97316;
+  --orange2:  #fb923c;
+  --red:      #ef4444;
+  --green:    #22c55e;
+  --lime:     #84cc16;
+  --yellow:   #fbbf24;
+  --cyan:     #22d3ee;
+  --purple:   #a78bfa;
+
+  --bg0: #030712;
+  --bg1: #0d1117;
+  --bg2: #111827;
+  --bg3: #1f2937;
+  --bg4: #374151;
+
+  --t1: #f9fafb;
+  --t2: #9ca3af;
+  --t3: #4b5563;
+
+  --border: rgba(249,115,22,0.18);
+  --glow:   rgba(249,115,22,0.08);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:hidden; background:var(--bg0); color:var(--t1); font-family:'Rajdhani', sans-serif; }
+
+/* ══════════════════════════════════════════════
+   CIRCUIT BACKGROUND SVG
+══════════════════════════════════════════════ */
+#circuit-bg {
+  position:fixed; inset:0; z-index:0; pointer-events:none; opacity:0.18;
+}
+
+/* Scanlines */
+#scanlines {
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+}
+
+/* Radial vignette */
+#vignette {
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.75) 100%);
+}
+
+/* ══════════════════════════════════════════════
+   TICKER
+══════════════════════════════════════════════ */
+#ticker-wrap {
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  height:24px; background:rgba(0,0,0,0.9); border-bottom:1px solid var(--border);
+  overflow:hidden; display:flex; align-items:center;
+}
+.ticker-inner {
+  display:flex; white-space:nowrap;
+  animation: ticker-scroll 40s linear infinite;
+  font-family:'Share Tech Mono', monospace; font-size:10px;
+  color:rgba(249,115,22,0.55); letter-spacing:.12em;
+}
+.ticker-inner span { margin:0 2rem; }
+.ticker-inner span::before { content:"▸ "; color:rgba(249,115,22,0.25); }
+@keyframes ticker-scroll {
+  from { transform:translateX(0); }
+  to   { transform:translateX(-50%); }
+}
+
+/* ══════════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════════ */
+#header {
+  position:fixed; top:24px; left:0; right:0; z-index:90;
+  height:58px; display:flex; align-items:center; justify-content:space-between;
+  padding:0 1.5rem;
+  background:rgba(3,7,18,0.92); backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+
+.logo-area { display:flex; align-items:center; gap:1rem; }
+.logo-hex {
+  width:38px; height:38px; flex-shrink:0;
+}
+.logo-text h1 {
+  font-family:'Cinzel', serif; font-size:14px; font-weight:600;
+  color:var(--yellow); letter-spacing:.08em; line-height:1.1;
+}
+.logo-text p {
+  font-family:'Share Tech Mono', monospace; font-size:9px;
+  color:rgba(255,255,255,0.22); letter-spacing:.3em; text-transform:uppercase;
+}
+
+.header-status {
+  display:flex; align-items:center; gap:1.5rem;
+  font-family:'Share Tech Mono', monospace; font-size:9px;
+  color:rgba(255,255,255,0.25); letter-spacing:.15em;
+}
+.status-dot {
+  display:inline-block; width:6px; height:6px; border-radius:50%;
+  background:var(--green); animation:pulse-dot 2s ease-in-out infinite;
+  margin-right:5px;
+}
+@keyframes pulse-dot {
+  0%,100%{ opacity:1; transform:scale(1); }
+  50%{ opacity:.4; transform:scale(.7); }
+}
+.header-alerts {
+  display:flex; align-items:center; gap:.5rem;
+  color:var(--red); font-size:9px; font-family:'Share Tech Mono', monospace;
+}
+.header-alerts .dot { background:var(--red); }
+#live-clock {
+  text-align:right;
+  font-family:'Share Tech Mono', monospace;
+}
+#live-clock .time { color:var(--yellow); font-size:13px; letter-spacing:.15em; }
+#live-clock .date { color:rgba(255,255,255,0.2); font-size:9px; letter-spacing:.2em; }
+
+/* ══════════════════════════════════════════════
+   LAYOUT: SIDEBAR + MAIN
+══════════════════════════════════════════════ */
+#shell {
+  position:fixed; top:82px; left:0; right:0; bottom:0; z-index:10;
+  display:flex;
+}
+
+/* ── SIDEBAR ── */
+#sidebar {
+  width:200px; flex-shrink:0;
+  background:rgba(0,0,0,0.6); backdrop-filter:blur(10px);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  padding:1.2rem 0;
+  overflow:hidden;
+}
+
+.nav-section-label {
+  font-family:'Share Tech Mono', monospace; font-size:8px;
+  color:rgba(255,255,255,0.18); letter-spacing:.35em; text-transform:uppercase;
+  padding:0 1rem; margin-bottom:.6rem;
+}
+
+.nav-item {
+  display:flex; align-items:center; gap:.75rem;
+  padding:.65rem 1rem; cursor:pointer;
+  border-left:2px solid transparent;
+  font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+  color:rgba(255,255,255,0.25);
+  transition:all .2s ease;
+  white-space:nowrap;
+}
+.nav-item:hover { color:rgba(255,255,255,.55); background:rgba(255,255,255,.03); }
+.nav-item.active {
+  color:var(--yellow); border-left-color:var(--orange);
+  background:linear-gradient(90deg, rgba(249,115,22,.1), transparent);
+}
+.nav-item .nav-icon { font-size:14px; width:18px; text-align:center; }
+.nav-item .nav-badge {
+  margin-left:auto; font-family:'Share Tech Mono', monospace; font-size:8px;
+  padding:1px 5px; background:rgba(239,68,68,.15);
+  border:1px solid rgba(239,68,68,.3); color:var(--red);
+}
+
+.sidebar-divider {
+  border:none; border-top:1px solid rgba(249,115,22,.08);
+  margin:.8rem 0;
+}
+
+/* Health gauges at bottom */
+.sidebar-bottom {
+  margin-top:auto; padding:.8rem 1rem;
+  border-top:1px solid rgba(249,115,22,.08);
+}
+.gauge-row { margin-bottom:.55rem; }
+.gauge-row .gauge-label {
+  display:flex; justify-content:space-between;
+  font-family:'Share Tech Mono', monospace; font-size:8px; margin-bottom:3px;
+}
+.gauge-row .gauge-label .gl { color:rgba(255,255,255,.3); letter-spacing:.15em; text-transform:uppercase; }
+.gauge-bar { height:2px; background:rgba(255,255,255,.05); overflow:hidden; }
+.gauge-fill { height:100%; transition:width 1.2s cubic-bezier(.16,1,.3,1); }
+
+/* ── MAIN ── */
+#main {
+  flex:1; overflow-y:auto; overflow-x:hidden;
+  padding:1.5rem;
+  scrollbar-width:thin; scrollbar-color:rgba(249,115,22,.2) transparent;
+}
+#main::-webkit-scrollbar { width:3px; }
+#main::-webkit-scrollbar-thumb { background:rgba(249,115,22,.2); }
+
+/* PAGE TRANSITIONS */
+.tab-page { display:none; animation:fadeUp .35s cubic-bezier(.16,1,.3,1); }
+.tab-page.active { display:block; }
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(12px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ══════════════════════════════════════════════
+   SHARED PANEL COMPONENTS
+══════════════════════════════════════════════ */
+.page-title {
+  font-family:'Cinzel', serif; font-size:18px; color:var(--yellow);
+  margin-bottom:2px;
+}
+.page-subtitle {
+  font-family:'Share Tech Mono', monospace; font-size:9px;
+  color:rgba(255,255,255,.2); letter-spacing:.2em; text-transform:uppercase;
+  margin-bottom:1.5rem;
+}
+
+.panel {
+  background:linear-gradient(135deg,#0c0c0c,#0f0f0f);
+  border:1px solid rgba(249,115,22,.12);
+  padding:1.2rem;
+  clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px));
+  position:relative;
+}
+.panel::after {
+  content:''; position:absolute; top:0; right:0;
+  width:16px; height:16px; background:rgba(249,115,22,.3);
+  clip-path:polygon(100% 0,0 0,100% 100%);
+}
+.panel-title {
+  font-family:'Share Tech Mono', monospace; font-size:9px;
+  color:rgba(249,115,22,.5); letter-spacing:.28em; text-transform:uppercase;
+  margin-bottom:1rem;
+}
+
+/* Metric card */
+.metric-card {
+  background:linear-gradient(135deg,#0c0c0c,#111);
+  padding:1.2rem 1.3rem;
+  position:relative; cursor:default;
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));
+  transition:transform .2s ease;
+}
+.metric-card:hover { transform:translateY(-3px); }
+.metric-card::after {
+  content:''; position:absolute; top:0; right:0;
+  width:12px; height:12px;
+  clip-path:polygon(100% 0,0 0,100% 100%);
+}
+.mc-label {
+  font-family:'Share Tech Mono', monospace; font-size:8.5px;
+  letter-spacing:.25em; text-transform:uppercase; margin-bottom:.5rem;
+}
+.mc-value { font-family:'Share Tech Mono', monospace; font-size:28px; font-weight:bold; line-height:1; }
+.mc-unit  { font-family:'Share Tech Mono', monospace; font-size:11px; opacity:.4; margin-left:3px; }
+.mc-sub   { font-family:'Share Tech Mono', monospace; font-size:9px; color:rgba(255,255,255,.22); margin-top:4px; }
+.mc-delta { font-family:'Share Tech Mono', monospace; font-size:9px; margin-top:6px; }
+.mc-live  { position:absolute; bottom:10px; right:12px; display:flex; align-items:center; gap:4px; }
+.mc-live-dot { width:5px; height:5px; border-radius:50%; animation:pulse-dot 1.5s infinite; }
+.mc-live-txt { font-family:'Share Tech Mono', monospace; font-size:8px; opacity:.35; }
+
+/* Grid helpers */
+.grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:.85rem; }
+.grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:.85rem; }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; }
+.col-span-3 { grid-column:span 3; }
+.col-span-2 { grid-column:span 2; }
+.lg-5-3 { display:grid; grid-template-columns:3fr 2fr; gap:.85rem; }
+.lg-5-2 { display:grid; grid-template-columns:3fr 2fr; gap:.85rem; }
+
+/* ══════════════════════════════════════════════
+   TAB: OVERVIEW / DASHBOARD
+══════════════════════════════════════════════ */
+/* Mini chart */
+.mini-chart { width:100%; height:180px; position:relative; }
+.mini-chart canvas { width:100%!important; height:100%!important; }
+
+/* Alert log */
+.alert-item {
+  display:flex; align-items:flex-start; gap:.75rem;
+  padding:.6rem 0; border-bottom:1px solid rgba(255,255,255,.04);
+}
+.alert-bar { width:3px; min-height:32px; flex-shrink:0; margin-top:2px; }
+.alert-msg { font-size:11px; color:rgba(255,255,255,.68); line-height:1.4; }
+.alert-meta { font-family:'Share Tech Mono', monospace; font-size:9px; color:rgba(255,255,255,.22); margin-top:2px; }
+.alert-tag {
+  font-family:'Share Tech Mono', monospace; font-size:8px;
+  padding:2px 6px; flex-shrink:0; margin-left:auto;
+  border:1px solid; clip-path:polygon(0 0,100% 0,100% 100%,0 100%);
+}
+
+/* Zone cards */
+.zone-mini {
+  padding:.75rem; background:rgba(255,255,255,.02);
+  border:1px solid rgba(255,255,255,.06);
+}
+.zone-mini-name { font-family:'Share Tech Mono', monospace; font-size:9px; color:rgba(255,255,255,.55); letter-spacing:.1em; margin-bottom:.3rem; }
+.zone-mini-val  { font-family:'Share Tech Mono', monospace; font-size:20px; font-weight:bold; margin-bottom:.4rem; }
+.zone-mini-bar  { height:2px; background:rgba(255,255,255,.05); }
+.zone-mini-fill { height:100%; transition:width 1s ease; }
+.zone-mini-meta { font-family:'Share Tech Mono', monospace; font-size:8px; color:rgba(255,255,255,.2); margin-top:3px; }
+
+/* Energy mix bars */
+.mix-bar-row { margin-bottom:.7rem; }
+.mix-bar-row .mix-label { display:flex; justify-content:space-between; font-family:'Share Tech Mono', monospace; font-size:9px; margin-bottom:3px; }
+.mix-bar-row .mix-label .ml { color:rgba(255,255,255,.3); }
+.mix-track { height:2px; background:rgba(255,255,255,.05); }
+.mix-fill { height:100%; transition:width 1.3s ease; box-shadow:0 0 5px currentColor; }
+
+/* ══════════════════════════════════════════════
+   TAB: 3D CAMPUS
+══════════════════════════════════════════════ */
+#tab-3d { position:relative; }
+#canvas-wrap {
+  width:100%; height:calc(100vh - 180px); min-height:500px;
+  position:relative; overflow:hidden;
+  border:1px solid rgba(249,115,22,.12);
+  clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px));
+}
+#campus-canvas { display:block; width:100%!important; height:100%!important; cursor:grab; }
+#canvas-wrap.grabbing #campus-canvas { cursor:grabbing; }
+
+/* 3D overlays */
+#zone-panel {
+  position:absolute; right:12px; top:12px;
+  width:190px; background:rgba(3,7,18,.97);
+  border:1px solid rgba(249,115,22,.2); border-radius:8px;
+  padding:.7rem; z-index:50;
+}
+#zone-panel h3 { font-size:11px; font-weight:600; color:var(--t1); margin-bottom:6px; letter-spacing:.08em; }
+.zp-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:4px 5px; border-radius:4px; cursor:pointer; margin-bottom:2px;
+  border:1px solid transparent; transition:background .15s;
+}
+.zp-row:hover { background:rgba(255,255,255,.05); }
+.zp-row.sel { background:#0f1e10; border-color:var(--orange); }
+.zp-row.alrt { border-left:3px solid var(--red)!important; padding-left:3px; }
+.zp-name { font-family:'Share Tech Mono', monospace; font-size:9px; color:var(--t2); }
+.zp-kwh  { font-family:'Share Tech Mono', monospace; font-size:10px; font-weight:700; }
+.zp-divider { border:none; border-top:1px solid rgba(249,115,22,.1); margin:.5rem 0; padding-top:.5rem; }
+.zp-stat { display:flex; justify-content:space-between; margin-bottom:2px; }
+.zp-sl { font-family:'Share Tech Mono', monospace; font-size:9px; color:var(--t3); }
+.zp-sv { font-family:'Share Tech Mono', monospace; font-size:10px; font-weight:700; }
+
+#legend-box {
+  position:absolute; left:12px; bottom:12px;
+  background:rgba(3,7,18,.93); border:1px solid rgba(249,115,22,.15);
+  border-radius:8px; padding:.6rem .75rem; z-index:50;
+}
+#legend-box h4 { font-family:'Share Tech Mono', monospace; font-size:8px; color:var(--t3); letter-spacing:.08em; margin-bottom:4px; }
+.leg-row { display:flex; align-items:center; gap:6px; margin:2px 0; }
+.leg-color { width:16px; height:10px; border-radius:2px; flex-shrink:0; }
+.leg-lbl { font-family:'Share Tech Mono', monospace; font-size:9px; color:var(--t2); }
+
+#hint-box {
+  position:absolute; left:12px; top:12px;
+  background:rgba(3,7,18,.8); border:1px solid rgba(249,115,22,.1);
+  border-radius:6px; padding:.4rem .6rem; z-index:50;
+  font-family:'Share Tech Mono', monospace; color:rgba(255,255,255,.25); font-size:8.5px; line-height:2;
+}
+
+#bldg-tooltip {
+  position:absolute; bottom:60px; left:50%; transform:translateX(-50%);
+  background:rgba(3,7,18,.97); border:1px solid var(--orange);
+  border-radius:8px; padding:.7rem 1.2rem; z-index:60;
+  text-align:center; display:none; max-width:420px;
+}
+#bldg-tooltip .tt-name { color:var(--orange); font-size:13px; font-weight:700; font-family:'Rajdhani', sans-serif; }
+#bldg-tooltip .tt-kwh  { color:var(--yellow); font-size:11px; margin-top:3px; font-family:'Share Tech Mono', monospace; }
+#bldg-tooltip .tt-info { font-family:'Share Tech Mono', monospace; font-size:9px; color:var(--t2); margin-top:4px; line-height:1.8; white-space:pre-line; }
+
+/* ══════════════════════════════════════════════
+   TAB: GRID STATUS
+══════════════════════════════════════════════ */
+.grid-param {
+  padding:1rem;
+  background:linear-gradient(135deg,#0c0c0c,#111);
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));
+}
+.gp-label { font-family:'Share Tech Mono', monospace; font-size:9px; color:rgba(255,255,255,.28); letter-spacing:.2em; text-transform:uppercase; margin-bottom:.4rem; }
+.gp-value { font-family:'Share Tech Mono', monospace; font-size:22px; font-weight:bold; }
+.gp-note  { font-family:'Share Tech Mono', monospace; font-size:9px; color:rgba(255,255,255,.2); margin-top:.4rem; }
+
+/* SVG charts */
+.svg-chart { width:100%; overflow:visible; }
+
+/* ══════════════════════════════════════════════
+   TAB: SOLAR
+══════════════════════════════════════════════ */
+.array-card {
+  padding:.75rem; background:rgba(255,255,255,.02);
+  border:1px solid rgba(255,255,255,.06);
+}
+.array-id  { font-family:'Share Tech Mono', monospace; font-size:10px; color:rgba(255,255,255,.6); margin-bottom:.3rem; }
+.array-val { font-family:'Share Tech Mono', monospace; font-size:18px; font-weight:bold; margin-bottom:.4rem; }
+.array-bar { height:2px; background:rgba(255,255,255,.05); margin-top:.3rem; }
+.array-fill{ height:100%; transition:width 1s ease; }
+
+/* ══════════════════════════════════════════════
+   TAB: FACILITIES
+══════════════════════════════════════════════ */
+.facility-card {
+  padding:1.1rem;
+  background:linear-gradient(135deg,#0c0c0c,#111);
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));
+  cursor:default; transition:transform .2s ease;
+}
+.facility-card:hover { transform:translateY(-2px); }
+.fac-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:.6rem; }
+.fac-name   { font-family:'Share Tech Mono', monospace; font-size:11px; color:rgba(255,255,255,.8); letter-spacing:.08em; }
+.fac-info   { font-family:'Share Tech Mono', monospace; font-size:8px; color:rgba(255,255,255,.22); margin-top:2px; }
+.fac-badge  { font-family:'Share Tech Mono', monospace; font-size:8px; padding:2px 7px; border:1px solid; }
+.fac-grid   { display:grid; grid-template-columns:repeat(3,1fr); gap:.4rem; margin-bottom:.7rem; }
+.fac-stat   { padding:.4rem; background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.04); text-align:center; }
+.fac-stat-k { font-family:'Share Tech Mono', monospace; font-size:8px; color:rgba(255,255,255,.22); letter-spacing:.12em; margin-bottom:2px; }
+.fac-stat-v { font-family:'Share Tech Mono', monospace; font-size:10px; color:rgba(255,255,255,.7); }
+.fac-util   { font-family:'Share Tech Mono', monospace; font-size:9px; color:rgba(255,255,255,.28); display:flex; justify-content:space-between; margin-bottom:3px; }
+.fac-bar    { height:3px; background:rgba(255,255,255,.05); }
+.fac-fill   { height:100%; transition:width 1s ease; box-shadow:0 0 6px currentColor; }
+
+/* ══════════════════════════════════════════════
+   TAB: ALERTS
+══════════════════════════════════════════════ */
+.filter-btn {
+  font-family:'Share Tech Mono', monospace; font-size:9px;
+  padding:.35rem .85rem; letter-spacing:.15em; text-transform:uppercase;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08);
+  color:rgba(255,255,255,.3); cursor:pointer; transition:all .2s ease;
+}
+.filter-btn:hover { color:rgba(255,255,255,.6); }
+.filter-btn.active { background:rgba(249,115,22,.12); border-color:rgba(249,115,22,.4); color:var(--yellow); }
+
+.alert-full-item {
+  display:flex; align-items:flex-start; gap:1rem;
+  padding:1rem 0; border-bottom:1px solid rgba(255,255,255,.05);
+}
+.afi-bar { width:3px; min-height:48px; flex-shrink:0; margin-top:2px; box-shadow:0 0 6px currentColor; }
+.afi-body { flex:1; }
+.afi-head { display:flex; align-items:center; gap:.6rem; margin-bottom:.3rem; }
+.afi-tag  { font-family:'Share Tech Mono', monospace; font-size:9px; padding:2px 7px; border:1px solid; }
+.afi-zone { font-family:'Share Tech Mono', monospace; font-size:9px; color:rgba(255,255,255,.3); }
+.afi-time { font-family:'Share Tech Mono', monospace; font-size:9px; color:rgba(255,255,255,.18); }
+.afi-msg  { font-size:12px; color:rgba(255,255,255,.7); margin-bottom:3px; }
+.afi-action { font-family:'Share Tech Mono', monospace; font-size:9px; color:rgba(249,115,22,.5); }
+.afi-ack  {
+  font-family:'Share Tech Mono', monospace; font-size:8px;
+  padding:.3rem .6rem; border:1px solid rgba(255,255,255,.1);
+  color:rgba(255,255,255,.3); cursor:pointer; background:none;
+  transition:all .2s; flex-shrink:0;
+}
+.afi-ack:hover { color:rgba(255,255,255,.7); border-color:rgba(255,255,255,.3); }
+
+/* ══════════════════════════════════════════════
+   TAB: REPORTS
+══════════════════════════════════════════════ */
+.report-item {
+  display:flex; align-items:center; gap:.8rem;
+  padding:.75rem; background:rgba(255,255,255,.02);
+  border:1px solid rgba(255,255,255,.05);
+  cursor:pointer; transition:background .2s; margin-bottom:.4rem;
+}
+.report-item:hover { background:rgba(255,255,255,.04); }
+.report-icon {
+  width:36px; height:36px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Share Tech Mono', monospace; font-size:10px; font-weight:bold;
+  border:1px solid;
+}
+.report-name { font-size:11px; color:rgba(255,255,255,.65); transition:color .2s; }
+.report-item:hover .report-name { color:rgba(255,255,255,.9); }
+.report-date { font-family:'Share Tech Mono', monospace; font-size:8px; color:rgba(255,255,255,.22); margin-top:2px; }
+.report-dl { color:rgba(255,255,255,.2); font-size:16px; margin-left:auto; transition:color .2s; }
+.report-item:hover .report-dl { color:var(--yellow); }
+
+/* ══════════════════════════════════════════════
+   TAB: SETTINGS
+══════════════════════════════════════════════ */
+.setting-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.75rem 0; border-bottom:1px solid rgba(255,255,255,.05);
+}
+.setting-label { font-size:12px; color:rgba(255,255,255,.65); }
+.setting-desc  { font-family:'Share Tech Mono', monospace; font-size:9px; color:rgba(255,255,255,.22); margin-top:2px; }
+.toggle-btn {
+  width:42px; height:22px; border-radius:11px; cursor:pointer;
+  position:relative; transition:background .3s;
+  border:1px solid rgba(255,255,255,.1); flex-shrink:0;
+}
+.toggle-btn.on { background:rgba(249,115,22,.25); border-color:rgba(249,115,22,.5); }
+.toggle-btn.off{ background:rgba(255,255,255,.06); }
+.toggle-knob {
+  position:absolute; top:2px; width:16px; height:16px;
+  border-radius:50%; transition:left .25s cubic-bezier(.175,.885,.32,1.275), background .3s;
+}
+.toggle-btn.on  .toggle-knob { left:22px; background:var(--yellow); }
+.toggle-btn.off .toggle-knob { left:2px;  background:rgba(255,255,255,.3); }
+
+.sysinfo-row {
+  display:flex; justify-content:space-between;
+  font-family:'Share Tech Mono', monospace; font-size:10px;
+  padding:.4rem 0; border-bottom:1px solid rgba(255,255,255,.04);
+}
+.sysinfo-row .sk { color:rgba(255,255,255,.28); letter-spacing:.1em; }
+.sysinfo-row .sv { color:rgba(255,255,255,.6); }
+
+/* ══════════════════════════════════════════════
+   TAB: AI CHATBOT
+══════════════════════════════════════════════ */
+#chat-messages {
+  height:340px; overflow-y:auto; padding:.5rem;
+  background:rgba(0,0,0,.3); border:1px solid rgba(249,115,22,.1);
+  margin-bottom:.75rem; display:flex; flex-direction:column; gap:.6rem;
+  scrollbar-width:thin; scrollbar-color:rgba(249,115,22,.15) transparent;
+}
+.chat-msg {
+  max-width:75%; padding:.5rem .8rem;
+  font-size:12px; line-height:1.5;
+}
+.chat-msg.user {
+  align-self:flex-end;
+  background:rgba(249,115,22,.12); border:1px solid rgba(249,115,22,.2);
+  clip-path:polygon(0 0,100% 0,100% 100%,8px 100%,0 calc(100% - 8px));
+}
+.chat-msg.bot {
+  align-self:flex-start;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+  clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,0 100%);
+  color:rgba(255,255,255,.75);
+}
+.chat-msg.bot .bot-name { font-family:'Share Tech Mono', monospace; font-size:8px; color:rgba(249,115,22,.5); margin-bottom:3px; letter-spacing:.1em; }
+#chat-input-row { display:flex; gap:.5rem; }
+#chat-input {
+  flex:1; background:rgba(255,255,255,.04); border:1px solid rgba(249,115,22,.2);
+  padding:.5rem .8rem; color:var(--t1); font-family:'Rajdhani', sans-serif; font-size:13px;
+  outline:none; transition:border-color .2s;
+}
+#chat-input:focus { border-color:rgba(249,115,22,.5); }
+#chat-send {
+  background:rgba(249,115,22,.15); border:1px solid rgba(249,115,22,.35);
+  color:var(--yellow); font-family:'Share Tech Mono', monospace; font-size:9px;
+  padding:0 1.2rem; cursor:pointer; letter-spacing:.1em;
+  transition:background .2s;
+}
+#chat-send:hover { background:rgba(249,115,22,.28); }
+
+/* Quick prompts */
+.quick-prompts { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.75rem; }
+.qp-btn {
+  font-family:'Share Tech Mono', monospace; font-size:9px;
+  padding:.25rem .6rem; background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1); color:rgba(255,255,255,.4);
+  cursor:pointer; transition:all .2s; letter-spacing:.08em;
+}
+.qp-btn:hover { background:rgba(249,115,22,.1); border-color:rgba(249,115,22,.3); color:var(--yellow); }
+
+/* ══════════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════════ */
+#footer-bar {
+  display:flex; align-items:center; justify-content:space-between;
+  font-family:'Share Tech Mono', monospace; font-size:8px;
+  color:rgba(255,255,255,.15); letter-spacing:.2em; text-transform:uppercase;
+  padding:.75rem 0; margin-top:1.5rem;
+  border-top:1px solid rgba(249,115,22,.06);
+}
+
+/* ══════════════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════════════ */
+@keyframes fadeIn  { from{opacity:0} to{opacity:1} }
+@keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+.stagger-0 { animation:slideUp .5s .0s cubic-bezier(.16,1,.3,1) both; }
+.stagger-1 { animation:slideUp .5s .07s cubic-bezier(.16,1,.3,1) both; }
+.stagger-2 { animation:slideUp .5s .14s cubic-bezier(.16,1,.3,1) both; }
+.stagger-3 { animation:slideUp .5s .21s cubic-bezier(.16,1,.3,1) both; }
+
+/* Pulse alerts */
+@keyframes alertPulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)} 50%{box-shadow:0 0 0 4px rgba(239,68,68,0)} }
+</style>
+</head>
+<body>
+
+<!-- Circuit BG -->
+<svg id="circuit-bg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <filter id="cglow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="cTrace" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#f97316" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M0 140 L200 140 L200 90 L500 90" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M500 90 L500 220 L800 220" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M800 220 L800 150 L1200 150" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M0 340 L120 340 L120 420 L360 420" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M360 420 L360 310 L620 310" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M620 310 L620 470 L960 470" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M960 470 L960 360 L1300 360" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M0 580 L260 580 L260 510 L520 510" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M520 510 L520 640 L840 640" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M240 0 L240 110 L380 110" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M680 0 L680 70 L860 70" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <path d="M1080 0 L1080 200" fill="none" stroke="#f97316" stroke-width="0.5" stroke-opacity="0.12"/>
+  <!-- Animated traces -->
+  <path d="M0 140 L200 140 L200 90 L500 90" fill="none" stroke="url(#cTrace)" stroke-width="1.5" filter="url(#cglow)" stroke-dasharray="60 9999">
+    <animate attributeName="stroke-dashoffset" from="0" to="-600" dur="3s" repeatCount="indefinite"/>
+  </path>
+  <path d="M360 420 L360 310 L620 310" fill="none" stroke="url(#cTrace)" stroke-width="1.5" filter="url(#cglow)" stroke-dasharray="60 9999">
+    <animate attributeName="stroke-dashoffset" from="0" to="-500" dur="4s" repeatCount="indefinite" begin="1.2s"/>
+  </path>
+  <path d="M800 220 L800 150 L1200 150" fill="none" stroke="url(#cTrace)" stroke-width="1.5" filter="url(#cglow)" stroke-dasharray="60 9999">
+    <animate attributeName="stroke-dashoffset" from="0" to="-700" dur="3.5s" repeatCount="indefinite" begin="0.6s"/>
+  </path>
+  <!-- Nodes -->
+  <circle cx="200" cy="140" r="3" fill="#f97316" fill-opacity="0.2" stroke="#f97316" stroke-width="0.8" stroke-opacity="0.4"/>
+  <circle cx="500" cy="90"  r="3" fill="#f97316" fill-opacity="0.2" stroke="#f97316" stroke-width="0.8" stroke-opacity="0.4"/>
+  <circle cx="800" cy="220" r="3" fill="#f97316" fill-opacity="0.2" stroke="#f97316" stroke-width="0.8" stroke-opacity="0.4"/>
+  <circle cx="360" cy="420" r="3" fill="#f97316" fill-opacity="0.2" stroke="#f97316" stroke-width="0.8" stroke-opacity="0.4"/>
+  <circle cx="620" cy="310" r="3" fill="#f97316" fill-opacity="0.2" stroke="#f97316" stroke-width="0.8" stroke-opacity="0.4"/>
+</svg>
+
+<div id="scanlines"></div>
+<div id="vignette"></div>
+
+<!-- TICKER -->
+<div id="ticker-wrap">
+  <div class="ticker-inner" id="ticker-inner">
+    <span>GRID FREQ: <span id="tk-freq">49.97</span> Hz</span>
+    <span>OUTSIDE TEMP: <span id="tk-temp">28.4</span>°C</span>
+    <span>SOLAR OUTPUT: 42.3 kW</span>
+    <span>PEAK DEMAND: <span id="tk-peak">304</span> kWh</span>
+    <span>CO₂ SAVED TODAY: <span id="tk-co2">1.24</span> T</span>
+    <span>ZONE-C — HIGH LOAD ALERT</span>
+    <span>DEMAND RESPONSE: STANDBY</span>
+    <span>TOTAL DEVICES: 762</span>
+    <span>GRID: 67% · SOLAR: 24% · BATTERY: 9%</span>
+    <span>UPTIME: 47 DAYS</span>
+    <span>GRID FREQ: <span class="tk-freq-dup">49.97</span> Hz</span>
+    <span>OUTSIDE TEMP: <span class="tk-temp-dup">28.4</span>°C</span>
+    <span>SOLAR OUTPUT: 42.3 kW</span>
+    <span>PEAK DEMAND: <span class="tk-peak-dup">304</span> kWh</span>
+    <span>CO₂ SAVED TODAY: <span class="tk-co2-dup">1.24</span> T</span>
+    <span>ZONE-C — HIGH LOAD ALERT</span>
+    <span>DEMAND RESPONSE: STANDBY</span>
+    <span>TOTAL DEVICES: 762</span>
+    <span>GRID: 67% · SOLAR: 24% · BATTERY: 9%</span>
+    <span>UPTIME: 47 DAYS</span>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header id="header">
+  <div class="logo-area">
+    <svg class="logo-hex" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="19,2 34,11 34,27 19,36 4,27 4,11" stroke="#f97316" stroke-width="1.5" fill="rgba(249,115,22,0.07)"/>
+      <polygon points="19,7 29,13 29,25 19,31 9,25 9,13" stroke="#f97316" stroke-width="0.7" fill="rgba(249,115,22,0.03)" stroke-opacity="0.4"/>
+      <path d="M19 11 L19 27 M13 14 L25 14 M13 22 L25 22" stroke="#fbbf24" stroke-width="1.3" stroke-opacity="0.9"/>
+    </svg>
+    <div class="logo-text">
+      <h1>Energy Guardian</h1>
+      <p>Campus Monitoring System · v3.2</p>
+    </div>
+    <div style="width:1px;height:28px;background:rgba(255,255,255,.1);margin:0 .5rem;"></div>
+    <div class="header-status">
+      <span><span class="status-dot"></span>GRID NOMINAL</span>
+      <span>·</span>
+      <span>FREQ <span id="hdr-freq">49.97</span> Hz</span>
+      <span>·</span>
+      <span>TEMP <span id="hdr-temp">28.4</span>°C</span>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:1.5rem;">
+    <div class="header-alerts">
+      <span class="status-dot dot" style="background:var(--red);"></span>
+      <span>3 ACTIVE ALERTS</span>
+    </div>
+    <div id="live-clock">
+      <div class="time" id="clock-time">--:--:--</div>
+      <div class="date" id="clock-date">--</div>
+    </div>
+  </div>
+</header>
+
+<!-- SHELL -->
+<div id="shell">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <p class="nav-section-label">Navigation</p>
+    <div class="nav-item active" data-tab="overview" onclick="switchTab('overview')">
+      <span class="nav-icon">◈</span> Overview
+    </div>
+    <div class="nav-item" data-tab="campus3d" onclick="switchTab('campus3d')">
+      <span class="nav-icon">⬡</span> 3D Campus
+    </div>
+    <div class="nav-item" data-tab="grid" onclick="switchTab('grid')">
+      <span class="nav-icon">⚡</span> Grid Status
+    </div>
+    <div class="nav-item" data-tab="solar" onclick="switchTab('solar')">
+      <span class="nav-icon">☀</span> Solar PV
+    </div>
+    <div class="nav-item" data-tab="facilities" onclick="switchTab('facilities')">
+      <span class="nav-icon">🏗</span> Facilities
+    </div>
+    <div class="nav-item" data-tab="alerts" onclick="switchTab('alerts')">
+      <span class="nav-icon">⚠</span> Alerts
+      <span class="nav-badge" id="alerts-badge">3</span>
+    </div>
+    <div class="nav-item" data-tab="chatbot" onclick="switchTab('chatbot')">
+      <span class="nav-icon">🤖</span> AI Chatbot
+    </div>
+    <div class="nav-item" data-tab="reports" onclick="switchTab('reports')">
+      <span class="nav-icon">◉</span> Reports
+    </div>
+    <div class="nav-item" data-tab="settings" onclick="switchTab('settings')">
+      <span class="nav-icon">◎</span> Settings
+    </div>
+
+    <!-- Health Gauges -->
+    <div class="sidebar-bottom">
+      <p class="nav-section-label" style="padding:0;margin-bottom:.7rem;">System Health</p>
+      <div class="gauge-row">
+        <div class="gauge-label">
+          <span class="gl">Transformer</span>
+          <span style="color:#f97316;font-family:'Share Tech Mono',monospace;font-size:8px;">85%</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-fill" style="width:85%;background:linear-gradient(90deg,rgba(249,115,22,.5),#f97316);box-shadow:0 0 5px rgba(249,115,22,.6);"></div></div>
+      </div>
+      <div class="gauge-row">
+        <div class="gauge-label">
+          <span class="gl">UPS Battery</span>
+          <span style="color:#22c55e;font-family:'Share Tech Mono',monospace;font-size:8px;">72%</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-fill" style="width:72%;background:linear-gradient(90deg,rgba(34,197,94,.5),#22c55e);"></div></div>
+      </div>
+      <div class="gauge-row">
+        <div class="gauge-label">
+          <span class="gl">HVAC Load</span>
+          <span style="color:#ef4444;font-family:'Share Tech Mono',monospace;font-size:8px;">96%</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-fill" style="width:96%;background:linear-gradient(90deg,rgba(239,68,68,.5),#ef4444);box-shadow:0 0 5px rgba(239,68,68,.6);"></div></div>
+      </div>
+      <div class="gauge-row">
+        <div class="gauge-label">
+          <span class="gl">Solar MPPT</span>
+          <span style="color:#22d3ee;font-family:'Share Tech Mono',monospace;font-size:8px;">61%</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-fill" style="width:61%;background:linear-gradient(90deg,rgba(34,211,238,.4),#22d3ee);"></div></div>
+      </div>
+      <div class="gauge-row">
+        <div class="gauge-label">
+          <span class="gl">Network</span>
+          <span style="color:#22c55e;font-family:'Share Tech Mono',monospace;font-size:8px;">38%</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-fill" style="width:38%;background:linear-gradient(90deg,rgba(34,197,94,.5),#22c55e);"></div></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main id="main">
+
+    <!-- ══════════════════════ TAB: OVERVIEW ══════════════════════ -->
+    <div class="tab-page active" id="tab-overview">
+      <div class="page-title">Live Operations Dashboard</div>
+      <div class="page-subtitle">Real-time energy telemetry · Building automation · Demand forecasting</div>
+
+      <!-- Metric Cards -->
+      <div class="grid-4" style="margin-bottom:.85rem;">
+        <div class="metric-card stagger-0" style="border:1px solid rgba(249,115,22,.2);box-shadow:inset 0 0 40px rgba(249,115,22,.08);">
+          <div class="mc-label" style="color:rgba(251,191,36,.6);">Active Load</div>
+          <div><span class="mc-value" id="mc-load" style="color:#fbbf24;text-shadow:0 0 16px rgba(249,115,22,.5);">278</span><span class="mc-unit" style="color:rgba(251,191,36,.4);">kWh</span></div>
+          <div class="mc-sub">62.3% of campus capacity</div>
+          <div class="mc-delta" style="color:#34d399;">▲ 3.2% vs last hour</div>
+          <div class="mc-live"><div class="mc-live-dot" style="background:#f97316;"></div><span class="mc-live-txt" style="color:rgba(251,191,36,.35);">LIVE</span></div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(249,115,22,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+        <div class="metric-card stagger-1" style="border:1px solid rgba(6,182,212,.2);box-shadow:inset 0 0 40px rgba(6,182,212,.08);">
+          <div class="mc-label" style="color:rgba(34,211,238,.6);">Forecast (1hr)</div>
+          <div><span class="mc-value" id="mc-proj" style="color:#22d3ee;text-shadow:0 0 16px rgba(6,182,212,.5);">304</span><span class="mc-unit" style="color:rgba(34,211,238,.4);">kWh</span></div>
+          <div class="mc-sub">ML model confidence: 91%</div>
+          <div class="mc-delta" style="color:#f87171;">▼ 1.1% vs last hour</div>
+          <div class="mc-live"><div class="mc-live-dot" style="background:#06b6d4;"></div><span class="mc-live-txt" style="color:rgba(34,211,238,.35);">LIVE</span></div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(6,182,212,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+        <div class="metric-card stagger-2" style="border:1px solid rgba(52,211,153,.2);box-shadow:inset 0 0 40px rgba(52,211,153,.08);">
+          <div class="mc-label" style="color:rgba(110,231,183,.6);">Efficiency Score</div>
+          <div><span class="mc-value" id="mc-eff" style="color:#6ee7b7;text-shadow:0 0 16px rgba(52,211,153,.5);">74</span><span class="mc-unit" style="color:rgba(110,231,183,.4);">/ 100</span></div>
+          <div class="mc-sub">Below target (75)</div>
+          <div class="mc-delta" style="color:#34d399;">▲ 0.8% vs last hour</div>
+          <div class="mc-live"><div class="mc-live-dot" style="background:#34d399;"></div><span class="mc-live-txt" style="color:rgba(110,231,183,.35);">LIVE</span></div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(52,211,153,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+        <div class="metric-card stagger-3" style="border:1px solid rgba(52,211,153,.2);box-shadow:inset 0 0 40px rgba(52,211,153,.08);">
+          <div class="mc-label" style="color:rgba(110,231,183,.6);">CO₂ Saved Today</div>
+          <div><span class="mc-value" id="mc-co2" style="color:#6ee7b7;text-shadow:0 0 16px rgba(52,211,153,.5);">1.24</span><span class="mc-unit" style="color:rgba(110,231,183,.4);">T</span></div>
+          <div class="mc-sub">vs coal baseline</div>
+          <div class="mc-live"><div class="mc-live-dot" style="background:#34d399;"></div><span class="mc-live-txt" style="color:rgba(110,231,183,.35);">LIVE</span></div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(52,211,153,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+      </div>
+
+      <!-- Demand Curve + Alert Log -->
+      <div class="lg-5-3" style="margin-bottom:.85rem;">
+        <div class="panel">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.8rem;">
+            <div>
+              <div class="panel-title">Demand Curve — Last 6 Hours</div>
+              <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,255,255,.2);margin-top:-8px;">Actual consumption vs ML forecast</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:1rem;font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,255,255,.25);">
+              <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:1px;background:#f59e0b;display:inline-block;"></span>Actual</span>
+              <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:1px;background:#22d3ee;display:inline-block;border-top:1px dashed #22d3ee;"></span>Forecast</span>
+            </div>
+          </div>
+          <svg id="demand-svg" class="svg-chart" viewBox="0 0 520 180" style="height:180px;"></svg>
+        </div>
+        <div class="panel" style="display:flex;flex-direction:column;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem;">
+            <div class="panel-title" style="margin-bottom:0;">Alert Log</div>
+            <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--red);background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);padding:2px 6px;">3 CRITICAL</span>
+          </div>
+          <div id="alert-log" style="flex:1;overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <!-- Zones + Energy Mix -->
+      <div class="lg-5-3" style="margin-bottom:.85rem;">
+        <div class="panel">
+          <div class="panel-title">Building Zones — Live Load</div>
+          <div class="grid-2" id="zone-grid"></div>
+        </div>
+        <div class="panel" style="display:flex;flex-direction:column;gap:1rem;">
+          <div>
+            <div class="panel-title">Weekly Consumption</div>
+            <svg id="weekly-svg" class="svg-chart" viewBox="0 0 280 100" style="height:100px;"></svg>
+          </div>
+          <div style="border-top:1px solid rgba(249,115,22,.08);padding-top:.8rem;">
+            <div class="panel-title">Energy Mix — Live</div>
+            <div class="mix-bar-row">
+              <div class="mix-label"><span class="ml">Grid Import</span><span style="color:#f97316;">67%</span></div>
+              <div class="mix-track"><div class="mix-fill" style="width:67%;background:#f97316;color:#f97316;"></div></div>
+            </div>
+            <div class="mix-bar-row">
+              <div class="mix-label"><span class="ml">Solar PV</span><span style="color:#22d3ee;">24%</span></div>
+              <div class="mix-track"><div class="mix-fill" style="width:24%;background:#22d3ee;color:#22d3ee;"></div></div>
+            </div>
+            <div class="mix-bar-row">
+              <div class="mix-label"><span class="ml">Battery</span><span style="color:#34d399;">9%</span></div>
+              <div class="mix-track"><div class="mix-fill" style="width:9%;background:#34d399;color:#34d399;"></div></div>
+            </div>
+          </div>
+          <div style="border-top:1px solid rgba(249,115,22,.08);padding-top:.8rem;">
+            <div class="panel-title">Quick Links</div>
+            <div style="display:flex;flex-direction:column;gap:.3rem;">
+              <button onclick="switchTab('campus3d')" style="background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);color:var(--yellow);font-family:'Share Tech Mono',monospace;font-size:9px;padding:.35rem .7rem;cursor:pointer;text-align:left;letter-spacing:.1em;transition:background .2s;" onmouseover="this.style.background='rgba(249,115,22,.18)'" onmouseout="this.style.background='rgba(249,115,22,.08)'">⬡ → VIEW 3D CAMPUS MAP</button>
+              <button onclick="switchTab('alerts')" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--red);font-family:'Share Tech Mono',monospace;font-size:9px;padding:.35rem .7rem;cursor:pointer;text-align:left;letter-spacing:.1em;transition:background .2s;" onmouseover="this.style.background='rgba(239,68,68,.18)'" onmouseout="this.style.background='rgba(239,68,68,.08)'">⚠ → MANAGE ACTIVE ALERTS</button>
+              <button onclick="switchTab('chatbot')" style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);color:var(--purple);font-family:'Share Tech Mono',monospace;font-size:9px;padding:.35rem .7rem;cursor:pointer;text-align:left;letter-spacing:.1em;transition:background .2s;" onmouseover="this.style.background='rgba(167,139,250,.18)'" onmouseout="this.style.background='rgba(167,139,250,.08)'">🤖 → ASK AI CHATBOT</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="footer-bar">
+        <span>Energy Guardian v3.2.0 · Campus Energy Management Platform</span>
+        <span>© 2026 Energy Guardian Systems</span>
+        <span style="display:flex;align-items:center;gap:.5rem;"><span class="status-dot"></span>DATA STREAM ACTIVE · 762 DEVICES</span>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ TAB: 3D CAMPUS ══════════════════════ -->
+    <div class="tab-page" id="tab-campus3d">
+      <div class="page-title">3D Campus Map</div>
+      <div class="page-subtitle">Interactive WebGL · Left-drag rotate · Scroll zoom · Click to select zone</div>
+      <div id="canvas-wrap">
+        <canvas id="campus-canvas"></canvas>
+        <div id="hint-box">Left-drag &nbsp;Rotate<br>Right-drag &nbsp;Pan<br>Scroll &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Zoom<br>Click &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Select</div>
+        <div id="zone-panel">
+          <h3>📍 Campus Zones</h3>
+          <div id="zlist"></div>
+          <div class="zp-divider">
+            <div class="zp-stat"><span class="zp-sl">Total Load</span><span class="zp-sv" id="s-tot" style="color:#fbbf24;">—</span></div>
+            <div class="zp-stat"><span class="zp-sl">Active Alerts</span><span class="zp-sv" id="s-alc" style="color:#ef4444;">—</span></div>
+            <div id="s-ts" style="font-family:'Share Tech Mono',monospace;color:#374151;font-size:9px;margin-top:4px;">Initialising...</div>
+          </div>
+        </div>
+        <div id="legend-box">
+          <h4>ENERGY LEVEL</h4>
+          <div class="leg-row"><div class="leg-color" style="background:#22c55e;"></div><span class="leg-lbl">Low  &lt;0.5 kWh</span></div>
+          <div class="leg-row"><div class="leg-color" style="background:#84cc16;"></div><span class="leg-lbl">OK   0.5–1.0</span></div>
+          <div class="leg-row"><div class="leg-color" style="background:#fbbf24;"></div><span class="leg-lbl">Med  1.0–1.5</span></div>
+          <div class="leg-row"><div class="leg-color" style="background:#f97316;"></div><span class="leg-lbl">High 1.5–2.0</span></div>
+          <div class="leg-row"><div class="leg-color" style="background:#ef4444;"></div><span class="leg-lbl">Crit &gt;2.0</span></div>
+          <div style="border-top:1px solid rgba(249,115,22,.15);margin-top:4px;padding-top:4px;">
+            <div class="leg-row"><div class="leg-color" style="border:2px solid #f97316;background:transparent;"></div><span class="leg-lbl">Selected</span></div>
+            <div class="leg-row"><div class="leg-color" style="border:2px solid #ef4444;background:transparent;"></div><span class="leg-lbl">Alert (pulsing)</span></div>
+          </div>
+        </div>
+        <div id="bldg-tooltip">
+          <div class="tt-name" id="tt-name"></div>
+          <div class="tt-kwh" id="tt-kwh"></div>
+          <div class="tt-info" id="tt-info"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ TAB: GRID ══════════════════════ -->
+    <div class="tab-page" id="tab-grid">
+      <div class="page-title">Grid Status</div>
+      <div class="page-subtitle">Live grid parameters · Voltage · Frequency · Power quality</div>
+      <div class="grid-3" style="margin-bottom:.85rem;">
+        <div class="grid-param" style="border:1px solid rgba(52,211,153,.18);">
+          <div class="gp-label">Grid Voltage</div>
+          <div class="gp-value" style="color:#34d399;">230.4 V</div>
+          <div class="gp-note">±2V of nominal</div>
+        </div>
+        <div class="grid-param" style="border:1px solid rgba(52,211,153,.18);">
+          <div class="gp-label">Frequency</div>
+          <div class="gp-value" id="gp-freq" style="color:#34d399;">49.97 Hz</div>
+          <div class="gp-note">Deviation: −0.02 Hz</div>
+        </div>
+        <div class="grid-param" style="border:1px solid rgba(249,115,22,.2);">
+          <div class="gp-label">Power Factor</div>
+          <div class="gp-value" style="color:#f97316;">0.93</div>
+          <div class="gp-note">Target ≥ 0.95</div>
+        </div>
+        <div class="grid-param" style="border:1px solid rgba(52,211,153,.18);">
+          <div class="gp-label">THD</div>
+          <div class="gp-value" style="color:#34d399;">3.2%</div>
+          <div class="gp-note">Threshold: 5%</div>
+        </div>
+        <div class="grid-param" style="border:1px solid rgba(52,211,153,.18);">
+          <div class="gp-label">Import Tariff</div>
+          <div class="gp-value" style="color:#34d399;">₹7.80/kWh</div>
+          <div class="gp-note">Peak rate active</div>
+        </div>
+        <div class="grid-param" style="border:1px solid rgba(249,115,22,.2);">
+          <div class="gp-label">Transformer Load</div>
+          <div class="gp-value" style="color:#f97316;">84%</div>
+          <div class="gp-note">Capacity: 500 kVA</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-title">Voltage Profile — 24 Hours</div>
+          <svg id="voltage-svg" class="svg-chart" viewBox="0 0 420 160" style="height:160px;"></svg>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Frequency Profile — 24 Hours</div>
+          <svg id="freq-svg" class="svg-chart" viewBox="0 0 420 160" style="height:160px;"></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ TAB: SOLAR ══════════════════════ -->
+    <div class="tab-page" id="tab-solar">
+      <div class="page-title">Solar PV Monitoring</div>
+      <div class="page-subtitle">Rooftop arrays · MPPT performance · Irradiance curve</div>
+      <div class="grid-4" style="margin-bottom:.85rem;">
+        <div class="metric-card" style="border:1px solid rgba(34,211,238,.2);box-shadow:inset 0 0 30px rgba(34,211,238,.06);">
+          <div class="mc-label" style="color:rgba(34,211,238,.6);">Total Output</div>
+          <div><span class="mc-value" style="color:#22d3ee;">42.3</span><span class="mc-unit" style="color:rgba(34,211,238,.4);">kW</span></div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(34,211,238,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+        <div class="metric-card" style="border:1px solid rgba(249,115,22,.2);box-shadow:inset 0 0 30px rgba(249,115,22,.06);">
+          <div class="mc-label" style="color:rgba(251,191,36,.6);">Today's Yield</div>
+          <div><span class="mc-value" style="color:#fbbf24;">214</span><span class="mc-unit" style="color:rgba(251,191,36,.4);">kWh</span></div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(249,115,22,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+        <div class="metric-card" style="border:1px solid rgba(52,211,153,.2);box-shadow:inset 0 0 30px rgba(52,211,153,.06);">
+          <div class="mc-label" style="color:rgba(110,231,183,.6);">Array Efficiency</div>
+          <div><span class="mc-value" style="color:#6ee7b7;">68</span><span class="mc-unit" style="color:rgba(110,231,183,.4);">%</span></div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(52,211,153,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+        <div class="metric-card" style="border:1px solid rgba(52,211,153,.2);box-shadow:inset 0 0 30px rgba(52,211,153,.06);">
+          <div class="mc-label" style="color:rgba(110,231,183,.6);">CO₂ Offset</div>
+          <div><span class="mc-value" style="color:#6ee7b7;">0.81</span><span class="mc-unit" style="color:rgba(110,231,183,.4);">T</span></div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(52,211,153,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+      </div>
+      <div class="lg-5-3">
+        <div class="panel">
+          <div class="panel-title">Solar Irradiance & Output — Today</div>
+          <svg id="solar-svg" class="svg-chart" viewBox="0 0 520 180" style="height:180px;"></svg>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Array Status</div>
+          <div style="display:flex;flex-direction:column;gap:.6rem;">
+            <div class="array-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem;">
+                <span class="array-id">ARRAY-1</span>
+                <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#34d399;">NORMAL</span>
+              </div>
+              <div class="array-val" style="color:#34d399;">14.8 <span style="font-size:10px;opacity:.5;">kW · 92% eff</span></div>
+              <div class="array-bar"><div class="array-fill" style="width:92%;background:#34d399;"></div></div>
+            </div>
+            <div class="array-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem;">
+                <span class="array-id">ARRAY-2</span>
+                <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#34d399;">NORMAL</span>
+              </div>
+              <div class="array-val" style="color:#34d399;">13.2 <span style="font-size:10px;opacity:.5;">kW · 88% eff</span></div>
+              <div class="array-bar"><div class="array-fill" style="width:88%;background:#34d399;"></div></div>
+            </div>
+            <div class="array-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem;">
+                <span class="array-id">ARRAY-3</span>
+                <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#f97316;">WARNING</span>
+              </div>
+              <div class="array-val" style="color:#f97316;">11.6 <span style="font-size:10px;opacity:.5;">kW · 74% eff</span></div>
+              <div class="array-bar"><div class="array-fill" style="width:74%;background:#f97316;"></div></div>
+            </div>
+            <div class="array-card" style="border-color:rgba(239,68,68,.2);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem;">
+                <span class="array-id">ARRAY-4</span>
+                <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#ef4444;">CRITICAL</span>
+              </div>
+              <div class="array-val" style="color:#ef4444;">2.7 <span style="font-size:10px;opacity:.5;">kW · 18% eff</span></div>
+              <div class="array-bar"><div class="array-fill" style="width:18%;background:#ef4444;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ TAB: FACILITIES ══════════════════════ -->
+    <div class="tab-page" id="tab-facilities">
+      <div class="page-title">Facilities Overview</div>
+      <div class="page-subtitle">All monitored buildings · Load status · Facility managers</div>
+      <div class="grid-3" id="facilities-grid"></div>
+    </div>
+
+    <!-- ══════════════════════ TAB: ALERTS ══════════════════════ -->
+    <div class="tab-page" id="tab-alerts">
+      <div class="page-title">Alert Management</div>
+      <div class="page-subtitle">Active incidents · Warnings · System notifications</div>
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <button class="filter-btn active" onclick="filterAlerts('all',this)">ALL (7)</button>
+        <button class="filter-btn" onclick="filterAlerts('crit',this)">CRITICAL (3)</button>
+        <button class="filter-btn" onclick="filterAlerts('warn',this)">WARN</button>
+        <button class="filter-btn" onclick="filterAlerts('info',this)">INFO</button>
+        <button class="filter-btn" onclick="filterAlerts('ok',this)">OK</button>
+      </div>
+      <div class="panel" id="alerts-list"></div>
+    </div>
+
+    <!-- ══════════════════════ TAB: AI CHATBOT ══════════════════════ -->
+    <div class="tab-page" id="tab-chatbot">
+      <div class="page-title">AI Energy Chatbot</div>
+      <div class="page-subtitle">Ask about zones · Alerts · Recommendations · Savings</div>
+      <div class="lg-5-3">
+        <div class="panel" style="display:flex;flex-direction:column;">
+          <div class="panel-title">AI Assistant — Campus Energy Intelligence</div>
+          <div class="quick-prompts">
+            <button class="qp-btn" onclick="sendQuick('Which zone wastes the most?')">Which zone wastes most?</button>
+            <button class="qp-btn" onclick="sendQuick('Give me 3 recommendations')">3 recommendations</button>
+            <button class="qp-btn" onclick="sendQuick('What are the active alerts?')">Active alerts</button>
+            <button class="qp-btn" onclick="sendQuick('How much can we save?')">Savings potential</button>
+            <button class="qp-btn" onclick="sendQuick('Solar performance today')">Solar today</button>
+          </div>
+          <div id="chat-messages"></div>
+          <div id="chat-input-row">
+            <input id="chat-input" placeholder="Ask about energy data, alerts, savings..." onkeydown="if(event.key==='Enter')sendChat()">
+            <button id="chat-send" onclick="sendChat()">SEND</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.8rem;">
+          <div class="panel">
+            <div class="panel-title">Live Context</div>
+            <div class="sysinfo-row"><span class="sk">Total Load</span><span class="sv" id="ai-total">—</span></div>
+            <div class="sysinfo-row"><span class="sk">Highest Zone</span><span class="sv" style="color:#ef4444;">Block-C HVAC</span></div>
+            <div class="sysinfo-row"><span class="sk">Active Alerts</span><span class="sv" style="color:#f97316;">3</span></div>
+            <div class="sysinfo-row"><span class="sk">Savings/week</span><span class="sv" style="color:#34d399;">₹895</span></div>
+            <div class="sysinfo-row"><span class="sk">CO₂ Avoidable</span><span class="sv">1.88 kg/wk</span></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Top Recommendations</div>
+            <div style="display:flex;flex-direction:column;gap:.4rem;">
+              <div style="padding:.5rem;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);">
+                <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--red);margin-bottom:2px;">HIGH PRIORITY</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.65);">AC timers in Classrooms</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#34d399;margin-top:2px;">💰 Save ₹480/week</div>
+              </div>
+              <div style="padding:.5rem;background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.15);">
+                <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--orange);margin-bottom:2px;">MEDIUM</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.65);">Motion sensors in Lab</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#34d399;margin-top:2px;">💰 Save ₹320/week</div>
+              </div>
+              <div style="padding:.5rem;background:rgba(34,211,238,.06);border:1px solid rgba(34,211,238,.15);">
+                <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--cyan);margin-bottom:2px;">LOW</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.65);">Auto-off lights Library</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#34d399;margin-top:2px;">💰 Save ₹95/week</div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Explore</div>
+            <div style="display:flex;flex-direction:column;gap:.3rem;">
+              <button onclick="switchTab('campus3d')" style="background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);color:var(--yellow);font-family:'Share Tech Mono',monospace;font-size:9px;padding:.35rem .7rem;cursor:pointer;text-align:left;letter-spacing:.1em;" onmouseover="this.style.background='rgba(249,115,22,.18)'" onmouseout="this.style.background='rgba(249,115,22,.08)'">⬡ → VIEW 3D CAMPUS</button>
+              <button onclick="switchTab('alerts')" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--red);font-family:'Share Tech Mono',monospace;font-size:9px;padding:.35rem .7rem;cursor:pointer;text-align:left;letter-spacing:.1em;" onmouseover="this.style.background='rgba(239,68,68,.18)'" onmouseout="this.style.background='rgba(239,68,68,.08)'">⚠ → SEE ACTIVE ALERTS</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ TAB: REPORTS ══════════════════════ -->
+    <div class="tab-page" id="tab-reports">
+      <div class="page-title">Reports & Analytics</div>
+      <div class="page-subtitle">Consumption trends · Sustainability · Downloadable reports</div>
+      <div class="lg-5-3" style="margin-bottom:.85rem;">
+        <div class="panel">
+          <div class="panel-title">Monthly Energy Consumption — kWh</div>
+          <svg id="monthly-svg" class="svg-chart" viewBox="0 0 520 200" style="height:200px;"></svg>
+        </div>
+        <div class="panel" style="display:flex;flex-direction:column;">
+          <div class="panel-title">Available Reports</div>
+          <div style="flex:1;">
+            <div class="report-item">
+              <div class="report-icon" style="color:#f87171;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);">PDF</div>
+              <div><div class="report-name">February 2026 — Energy Summary</div><div class="report-date">Today, 12:00 · 1.4 MB</div></div>
+              <span class="report-dl">↓</span>
+            </div>
+            <div class="report-item">
+              <div class="report-icon" style="color:#f87171;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);">PDF</div>
+              <div><div class="report-name">Q4 2025 — Sustainability Report</div><div class="report-date">01 Jan 2026 · 3.2 MB</div></div>
+              <span class="report-dl">↓</span>
+            </div>
+            <div class="report-item">
+              <div class="report-icon" style="color:#6ee7b7;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.25);">XLSX</div>
+              <div><div class="report-name">Solar Commissioning Audit</div><div class="report-date">15 Dec 2025 · 0.8 MB</div></div>
+              <span class="report-dl">↓</span>
+            </div>
+            <div class="report-item">
+              <div class="report-icon" style="color:#f87171;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);">PDF</div>
+              <div><div class="report-name">HVAC Consumption Analysis</div><div class="report-date">01 Dec 2025 · 2.1 MB</div></div>
+              <span class="report-dl">↓</span>
+            </div>
+            <div class="report-item">
+              <div class="report-icon" style="color:#f87171;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);">PDF</div>
+              <div><div class="report-name">Annual Energy Benchmark 2025</div><div class="report-date">30 Nov 2025 · 5.6 MB</div></div>
+              <span class="report-dl">↓</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid-4">
+        <div class="metric-card" style="border:1px solid rgba(249,115,22,.18);box-shadow:inset 0 0 30px rgba(249,115,22,.06);">
+          <div class="mc-label" style="color:rgba(251,191,36,.5);">Feb Consumption</div>
+          <div><span class="mc-value" style="color:#fbbf24;font-size:22px;">48,600</span><span class="mc-unit" style="color:rgba(251,191,36,.4);">kWh</span></div>
+          <div class="mc-sub">↓ 7.4% vs Jan</div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(249,115,22,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+        <div class="metric-card" style="border:1px solid rgba(52,211,153,.18);box-shadow:inset 0 0 30px rgba(52,211,153,.06);">
+          <div class="mc-label" style="color:rgba(110,231,183,.5);">Savings YTD</div>
+          <div><span class="mc-value" style="color:#6ee7b7;font-size:22px;">₹46,540</span></div>
+          <div class="mc-sub">vs baseline 2024</div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(52,211,153,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+        <div class="metric-card" style="border:1px solid rgba(34,211,238,.18);box-shadow:inset 0 0 30px rgba(34,211,238,.06);">
+          <div class="mc-label" style="color:rgba(34,211,238,.5);">Solar Generated</div>
+          <div><span class="mc-value" style="color:#22d3ee;font-size:22px;">7,240</span><span class="mc-unit" style="color:rgba(34,211,238,.4);">kWh</span></div>
+          <div class="mc-sub">14.9% of total demand</div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(34,211,238,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+        <div class="metric-card" style="border:1px solid rgba(52,211,153,.18);box-shadow:inset 0 0 30px rgba(52,211,153,.06);">
+          <div class="mc-label" style="color:rgba(110,231,183,.5);">CO₂ Avoided</div>
+          <div><span class="mc-value" style="color:#6ee7b7;font-size:22px;">4.2</span><span class="mc-unit" style="color:rgba(110,231,183,.4);">T</span></div>
+          <div class="mc-sub">Feb 2026</div>
+          <div style="position:absolute;top:0;right:0;width:12px;height:12px;background:rgba(52,211,153,.4);clip-path:polygon(100% 0,0 0,100% 100%);"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════ TAB: SETTINGS ══════════════════════ -->
+    <div class="tab-page" id="tab-settings">
+      <div class="page-title">System Settings</div>
+      <div class="page-subtitle">Notifications · Thresholds · Automation rules</div>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-title">Notifications</div>
+          <div class="setting-row">
+            <div><div class="setting-label">Email Alerts</div><div class="setting-desc">Receive critical alerts via email</div></div>
+            <div class="toggle-btn on" onclick="toggleSetting(this)"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">SMS Alerts</div><div class="setting-desc">Receive SMS for critical events</div></div>
+            <div class="toggle-btn off" onclick="toggleSetting(this)"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Demand Response</div><div class="setting-desc">Auto-enroll in grid demand response</div></div>
+            <div class="toggle-btn on" onclick="toggleSetting(this)"><div class="toggle-knob"></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Automation</div>
+          <div class="setting-row">
+            <div><div class="setting-label">Auto-Optimise</div><div class="setting-desc">Automatically balance load across zones</div></div>
+            <div class="toggle-btn on" onclick="toggleSetting(this)"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Night Mode</div><div class="setting-desc">Reduce monitoring frequency after 22:00</div></div>
+            <div class="toggle-btn off" onclick="toggleSetting(this)"><div class="toggle-knob"></div></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">Solar Priority</div><div class="setting-desc">Prefer solar over grid when available</div></div>
+            <div class="toggle-btn on" onclick="toggleSetting(this)"><div class="toggle-knob"></div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">Thresholds</div>
+          <div class="setting-row" style="flex-direction:column;align-items:flex-start;">
+            <div class="setting-label" style="margin-bottom:.4rem;">Load Alert Threshold (%)</div>
+            <input type="number" value="85" style="width:100%;background:rgba(249,115,22,.04);border:1px solid rgba(249,115,22,.25);color:var(--yellow);font-family:'Share Tech Mono',monospace;font-size:14px;padding:.4rem .7rem;outline:none;">
+          </div>
+          <div class="setting-row" style="flex-direction:column;align-items:flex-start;">
+            <div class="setting-label" style="margin-bottom:.4rem;">Data Retention (days)</div>
+            <input type="number" value="90" style="width:100%;background:rgba(249,115,22,.04);border:1px solid rgba(249,115,22,.25);color:var(--yellow);font-family:'Share Tech Mono',monospace;font-size:14px;padding:.4rem .7rem;outline:none;">
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">System Info</div>
+          <div class="sysinfo-row"><span class="sk">Platform</span><span class="sv">Energy Guardian v3.2.0</span></div>
+          <div class="sysinfo-row"><span class="sk">Build</span><span class="sv">2026.02.28.0900</span></div>
+          <div class="sysinfo-row"><span class="sk">Last Sync</span><span class="sv">Just now</span></div>
+          <div class="sysinfo-row"><span class="sk">Devices Online</span><span class="sv">762 / 762</span></div>
+          <div class="sysinfo-row"><span class="sk">Uptime</span><span class="sv">47 days, 6 hrs</span></div>
+          <div class="sysinfo-row"><span class="sk">Data Points/min</span><span class="sv">~22,800</span></div>
+          <div class="sysinfo-row"><span class="sk">AI Engine</span><span class="sv" style="color:var(--orange);">Ryzen AI / ONNX</span></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════════ -->
+<script>
+/* ══════════════════════════
+   CLOCK
+══════════════════════════ */
+function updateClock(){
+  const d=new Date();
+  document.getElementById('clock-time').textContent=
+    d.toTimeString().slice(0,8);
+  document.getElementById('clock-date').textContent=
+    d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+}
+setInterval(updateClock,1000); updateClock();
+
+/* ══════════════════════════
+   NAV / TAB SWITCHING
+══════════════════════════ */
+let currentTab='overview';
+let threeJsInited=false;
+
+function switchTab(tab){
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+  currentTab=tab;
+  if(tab==='campus3d'&&!threeJsInited){
+    setTimeout(initThreeJS,80);
+    threeJsInited=true;
+  }
+  // Draw SVG charts on first visit
+  if(tab==='grid')   { drawVoltageChart(); drawFreqChart(); }
+  if(tab==='solar')  { drawSolarChart(); }
+  if(tab==='reports'){ drawMonthlyChart(); }
+}
+
+/* ══════════════════════════
+   LIVE DATA SIMULATION
+══════════════════════════ */
+let STATE = {
+  load:278, proj:304, eff:74, co2:1.24,
+  gridFreq:49.97, outsideTemp:28.4,
+};
+
+function bell(t,p,w){ return Math.exp(-0.5*((t-p)/w)**2); }
+function simEnergy(){
+  const h=new Date().getHours(), t=h+new Date().getMinutes()/60;
+  const base=Math.max(bell(t,10,3),bell(t,15,3));
+  const n=s=>(Math.random()-.5)*s*2;
+  return {
+    Hostel_A:       +Math.max(0.05, 0.5 +0.8 *bell(t,7,2)+0.6 *bell(t,21,2)+n(.05)).toFixed(2),
+    Hostel_B:       +Math.max(0.05, 0.45+0.75*bell(t,7,2)+0.55*bell(t,22,2)+n(.05)).toFixed(2),
+    Classroom_Block:+Math.max(0.1,  1.8 *base+n(.08)).toFixed(2),
+    Library:        +Math.max(0.05, 0.9 *base+0.2+n(.04)).toFixed(2),
+    Lab_1:          +Math.max(0.1,  1.5 *base+(h>=22?.8:0)+n(.1)).toFixed(2),
+    Admin_Block:    +Math.max(0.05, 0.7 *bell(t,11,3)+n(.03)).toFixed(2),
+  };
+}
+let ENERGY = simEnergy();
+let ALERTS_SET = new Set();
+
+function tick(){
+  STATE.load     = Math.round(240+Math.random()*110);
+  STATE.proj     = STATE.load + Math.round(18+Math.random()*28);
+  STATE.eff      = Math.round(62+Math.random()*28);
+  STATE.outsideTemp = parseFloat((27.5+Math.random()*2).toFixed(1));
+  STATE.gridFreq = parseFloat((49.92+Math.random()*0.12).toFixed(2));
+  STATE.co2      = parseFloat((1.1+Math.random()*0.4).toFixed(2));
+  ENERGY = simEnergy();
+  const h=new Date().getHours();
+  ALERTS_SET=new Set();
+  if(ENERGY.Lab_1>1.2&&h>=22)            ALERTS_SET.add('Lab_1');
+  if(ENERGY.Classroom_Block>1.0&&h>=20)  ALERTS_SET.add('Classroom_Block');
+  if(ENERGY.Hostel_B>1.0&&h>=20)         ALERTS_SET.add('Hostel_B');
+  updateUI();
+  if(threeJsInited) updateColors3D();
+}
+
+function updateUI(){
+  // Metric cards
+  animateNum('mc-load',  STATE.load,   '#fbbf24');
+  animateNum('mc-proj',  STATE.proj,   '#22d3ee');
+  animateNum('mc-eff',   STATE.eff,    '#6ee7b7');
+  document.getElementById('mc-co2').textContent = STATE.co2.toFixed(2);
+  document.getElementById('ai-total').textContent = STATE.load+' kWh';
+
+  // Ticker
+  ['tk-freq','hdr-freq','gp-freq'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=STATE.gridFreq+' Hz'; });
+  ['tk-temp','hdr-temp'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=STATE.outsideTemp+'°C'; });
+  ['tk-peak'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=STATE.proj; });
+  ['tk-co2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=STATE.co2.toFixed(2); });
+
+  renderZoneGrid();
+  renderAlertLog();
+  renderDemandChart();
+  render3DPanel();
+  renderWeeklyChart();
+}
+
+/* Animated counter */
+function animateNum(id, target, color){
+  const el=document.getElementById(id); if(!el) return;
+  const start=parseInt(el.textContent)||0;
+  const dur=600, t0=performance.now();
+  (function tick(now){
+    const p=Math.min((now-t0)/dur,1);
+    const e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(start+(target-start)*e);
+    if(p<1) requestAnimationFrame(tick);
+  })(performance.now());
+}
+
+/* ══════════════════════════
+   ZONE GRID (overview)
+══════════════════════════ */
+const ZONE_META={
+  'ADMIN BLOCK':    {load:82,  max:120,status:'normal',   occ:92, dev:148},
+  'ACADEMIC WING':  {load:109, max:130,status:'warning',  occ:87, dev:312},
+  'LAB COMPLEX':    {load:51,  max:140,status:'normal',   occ:44, dev:98 },
+  'BLOCK-C / HVAC': {load:134, max:140,status:'critical', occ:76, dev:54 },
+};
+function statusColor(s){ return s==='critical'?'#ef4444':s==='warning'?'#f97316':'#34d399'; }
+function renderZoneGrid(){
+  const g=document.getElementById('zone-grid'); if(!g) return;
+  g.innerHTML='';
+  Object.entries(ZONE_META).forEach(([name,z])=>{
+    const sc=statusColor(z.status);
+    const pct=Math.round((z.load/z.max)*100);
+    g.innerHTML+=`
+    <div class="zone-mini">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem;">
+        <span class="zone-mini-name">${name}</span>
+        <span style="font-family:'Share Tech Mono',monospace;font-size:8px;padding:1px 5px;color:${sc};background:${sc}20;border:1px solid ${sc}40;">${z.status.toUpperCase()}</span>
+      </div>
+      <div class="zone-mini-val" style="color:${sc};">${z.load} <span style="font-size:10px;color:rgba(255,255,255,.22);">kWh</span></div>
+      <div class="zone-mini-bar"><div class="zone-mini-fill" style="width:${pct}%;background:${sc};"></div></div>
+      <div class="zone-mini-meta">${z.occ}% occupancy · ${z.dev} devices</div>
+    </div>`;
+  });
+}
+
+/* ══════════════════════════
+   ALERT LOG (overview sidebar)
+══════════════════════════ */
+const ALERT_DATA=[
+  {type:'crit',msg:'Block-C HVAC drawing 18% above threshold',    time:'12:41',zone:'ZONE-C', action:'Reduce HVAC setpoint by 2°C'},
+  {type:'warn',msg:'Main transformer load approaching 85%',        time:'12:38',zone:'GRID',   action:'Shed non-critical loads'},
+  {type:'warn',msg:'Lab Wing UPS runtime below 20 min reserve',   time:'12:31',zone:'ZONE-B', action:'Initiate UPS battery health check'},
+  {type:'info',msg:'Solar Array-3 output reduced — cloud cover',   time:'12:20',zone:'SOLAR',  action:null},
+  {type:'ok',  msg:'Demand response event completed successfully', time:'11:55',zone:'GLOBAL', action:null},
+  {type:'warn',msg:'Power factor dropped to 0.91 on feeder-2',    time:'11:42',zone:'GRID',   action:'Check capacitor bank status'},
+  {type:'info',msg:'Scheduled maintenance: Library tomorrow',      time:'10:30',zone:'ZONE-E', action:null},
+];
+function typeColor(t){ return t==='crit'?'#ef4444':t==='warn'?'#f97316':t==='ok'?'#34d399':'#22d3ee'; }
+function renderAlertLog(){
+  const el=document.getElementById('alert-log'); if(!el) return;
+  el.innerHTML=ALERT_DATA.slice(0,5).map(a=>`
+    <div class="alert-item">
+      <div class="alert-bar" style="background:${typeColor(a.type)};"></div>
+      <div style="flex:1;min-width:0;">
+        <div class="alert-msg">${a.msg}</div>
+        <div class="alert-meta">${a.time} · ${a.zone}</div>
+      </div>
+      <span class="alert-tag" style="color:${typeColor(a.type)};border-color:${typeColor(a.type)}50;">${a.type.toUpperCase()}</span>
+    </div>`).join('');
+}
+
+/* ══════════════════════════
+   DEMAND CHART (SVG)
+══════════════════════════ */
+let historyData=[
+  {time:'07:00',load:192,proj:208},{time:'08:00',load:215,proj:228},
+  {time:'09:00',load:249,proj:261},{time:'10:00',load:274,proj:288},
+  {time:'11:00',load:261,proj:277},{time:'12:00',load:278,proj:304},
+];
+function renderDemandChart(){
+  const svg=document.getElementById('demand-svg'); if(!svg) return;
+  const W=520,H=180,PL=32,PR=10,PT=12,PB=24;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const loads=historyData.map(d=>d.load), projs=historyData.map(d=>d.proj);
+  const allVals=[...loads,...projs];
+  const vMin=Math.min(...allVals)*0.92, vMax=Math.max(...allVals)*1.06;
+  const n=historyData.length;
+  const xScale=i=>(i/(n-1))*cW+PL;
+  const yScale=v=>PB+cH-(v-vMin)/(vMax-vMin)*cH;
+
+  const loadPath=historyData.map((d,i)=>`${i===0?'M':'L'}${xScale(i)},${yScale(d.load)}`).join(' ');
+  const projPath=historyData.map((d,i)=>`${i===0?'M':'L'}${xScale(i)},${yScale(d.proj)}`).join(' ');
+  const loadArea=loadPath+` L${xScale(n-1)},${H-PB} L${xScale(0)},${H-PB} Z`;
+  const projArea=projPath+` L${xScale(n-1)},${H-PB} L${xScale(0)},${H-PB} Z`;
+
+  svg.innerHTML=`
+    <defs>
+      <linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.22"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="lg2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.12"/><stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    ${[...Array(4)].map((_,i)=>{
+      const y=PT+(cH/3)*i;
+      return `<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(255,255,255,.05)" stroke-width="1"/>`;
+    }).join('')}
+    ${historyData.map((d,i)=>`<text x="${xScale(i)}" y="${H-6}" text-anchor="middle" fill="rgba(255,255,255,.25)" font-size="9" font-family="'Share Tech Mono',monospace">${d.time}</text>`).join('')}
+    <path d="${projArea}" fill="url(#lg2)"/>
+    <path d="${projPath}" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <path d="${loadArea}" fill="url(#lg1)"/>
+    <path d="${loadPath}" fill="none" stroke="#f59e0b" stroke-width="2.2"/>
+    ${historyData.map((d,i)=>`<circle cx="${xScale(i)}" cy="${yScale(d.load)}" r="3" fill="#f59e0b" opacity="0.8"/>`).join('')}
+  `;
+  // Add new point to history
+  const slots=['13:00','14:00','15:00','16:00','17:00','18:00'];
+  historyData=[...historyData.slice(-5),{time:slots[Math.floor(Math.random()*slots.length)],load:STATE.load,proj:STATE.proj}];
+}
+
+/* ══════════════════════════
+   WEEKLY BAR CHART
+══════════════════════════ */
+const weeklyData=[
+  {day:'Mon',v:1842},{day:'Tue',v:2103},{day:'Wed',v:1978},
+  {day:'Thu',v:2241},{day:'Fri',v:2089},{day:'Sat',v:1254},{day:'Sun',v:980},
+];
+function renderWeeklyChart(){
+  const svg=document.getElementById('weekly-svg'); if(!svg) return;
+  const W=280,H=100,PL=24,PR=6,PT=8,PB=18;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const vMax=Math.max(...weeklyData.map(d=>d.v))*1.1;
+  const bw=Math.floor(cW/weeklyData.length)-4;
+  const gap=(cW-bw*weeklyData.length)/(weeklyData.length+1);
+  svg.innerHTML=weeklyData.map((d,i)=>{
+    const bh=(d.v/vMax)*cH;
+    const bx=PL+gap+(bw+gap)*i;
+    const by=PT+cH-bh;
+    return `
+      <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="rgba(249,115,22,.65)" rx="2"/>
+      <text x="${bx+bw/2}" y="${H-4}" text-anchor="middle" fill="rgba(255,255,255,.25)" font-size="8" font-family="'Share Tech Mono',monospace">${d.day}</text>
+    `;
+  }).join('');
+}
+
+/* ══════════════════════════
+   VOLTAGE & FREQUENCY CHARTS
+══════════════════════════ */
+function drawLineChart(svgId,data,color,vMin,vMax,keyY){
+  const svg=document.getElementById(svgId); if(!svg) return;
+  const W=420,H=160,PL=40,PR=8,PT=12,PB=24;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const n=data.length;
+  const xs=i=>(i/(n-1))*cW+PL;
+  const ys=v=>PT+cH-(v-vMin)/(vMax-vMin)*cH;
+  const linePath=data.map((d,i)=>`${i===0?'M':'L'}${xs(i)},${ys(d[keyY])}`).join(' ');
+  svg.innerHTML=`
+    ${[...Array(4)].map((_,i)=>{
+      const y=PT+(cH/3)*i;
+      return `<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(255,255,255,.05)" stroke-width="1"/>`;
+    }).join('')}
+    ${data.filter((_,i)=>i%2===0).map((d,i,arr)=>{
+      const origI=data.indexOf(d);
+      return `<text x="${xs(origI)}" y="${H-6}" text-anchor="middle" fill="rgba(255,255,255,.22)" font-size="8" font-family="'Share Tech Mono',monospace">${d.t}</text>`;
+    }).join('')}
+    ${[...Array(4)].map((_,i)=>{
+      const v=vMin+(vMax-vMin)/3*i;
+      return `<text x="${PL-4}" y="${ys(v)+3}" text-anchor="end" fill="rgba(255,255,255,.2)" font-size="8" font-family="'Share Tech Mono',monospace">${v.toFixed(1)}</text>`;
+    }).join('')}
+    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2"/>
+    ${data.map((d,i)=>`<circle cx="${xs(i)}" cy="${ys(d[keyY])}" r="2.5" fill="${color}" opacity="0.7"/>`).join('')}
+  `;
+}
+const voltageData=[
+  {t:'00:00',v:229},{t:'04:00',v:231},{t:'08:00',v:228},{t:'10:00',v:226},
+  {t:'12:00',v:230},{t:'14:00',v:232},{t:'16:00',v:229},{t:'20:00',v:231},{t:'Now',v:230},
+];
+const freqData=[
+  {t:'00:00',f:50.01},{t:'04:00',f:49.99},{t:'08:00',f:49.97},{t:'10:00',f:50.02},
+  {t:'12:00',f:49.98},{t:'14:00',f:50.00},{t:'16:00',f:49.96},{t:'20:00',f:50.01},{t:'Now',f:49.97},
+];
+function drawVoltageChart(){ drawLineChart('voltage-svg',voltageData,'#22d3ee',224,234,'v'); }
+function drawFreqChart(){ drawLineChart('freq-svg',freqData,'#f59e0b',49.90,50.10,'f'); }
+
+/* Solar chart */
+const solarIrr=[
+  {t:'06:00',w:0},{t:'07:00',w:48},{t:'08:00',w:142},{t:'09:00',w:318},
+  {t:'10:00',w:496},{t:'11:00',w:612},{t:'12:00',w:683},{t:'13:00',w:741},
+  {t:'14:00',w:688},{t:'15:00',w:541},{t:'16:00',w:380},{t:'17:00',w:194},{t:'18:00',w:32},
+];
+function drawSolarChart(){
+  const svg=document.getElementById('solar-svg'); if(!svg) return;
+  const W=520,H=180,PL=32,PR=10,PT=12,PB=24;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const n=solarIrr.length;
+  const vMax=800;
+  const xs=i=>(i/(n-1))*cW+PL;
+  const ys=v=>PT+cH-(v/vMax)*cH;
+  const path=solarIrr.map((d,i)=>`${i===0?'M':'L'}${xs(i)},${ys(d.w)}`).join(' ');
+  const area=path+` L${xs(n-1)},${H-PB} L${xs(0)},${H-PB} Z`;
+  svg.innerHTML=`
+    <defs><linearGradient id="solGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.28"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${[...Array(4)].map((_,i)=>{
+      const y=PT+(cH/3)*i;
+      return `<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(255,255,255,.05)" stroke-width="1"/>`;
+    }).join('')}
+    ${solarIrr.filter((_,i)=>i%2===0).map((d,i)=>{
+      const origI=solarIrr.indexOf(d);
+      return `<text x="${xs(origI)}" y="${H-6}" text-anchor="middle" fill="rgba(255,255,255,.25)" font-size="9" font-family="'Share Tech Mono',monospace">${d.t}</text>`;
+    }).join('')}
+    <path d="${area}" fill="url(#solGrad)"/>
+    <path d="${path}" fill="none" stroke="#f59e0b" stroke-width="2.2"/>
+  `;
+}
+
+/* Monthly chart */
+const monthlyData=[
+  {m:'Aug',v:62400},{m:'Sep',v:58900},{m:'Oct',v:54100},
+  {m:'Nov',v:49800},{m:'Dec',v:51200},{m:'Jan',v:55300},{m:'Feb',v:48600},
+];
+function drawMonthlyChart(){
+  const svg=document.getElementById('monthly-svg'); if(!svg) return;
+  const W=520,H=200,PL=46,PR=8,PT=12,PB=24;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const vMax=Math.max(...monthlyData.map(d=>d.v))*1.1;
+  const bw=Math.floor(cW/monthlyData.length)-6;
+  svg.innerHTML=monthlyData.map((d,i)=>{
+    const bh=(d.v/vMax)*cH;
+    const bx=PL+i*(bw+6)+3;
+    const by=PT+cH-bh;
+    return `
+      <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="rgba(249,115,22,.7)" rx="2"/>
+      <text x="${bx+bw/2}" y="${H-6}" text-anchor="middle" fill="rgba(255,255,255,.3)" font-size="9" font-family="'Share Tech Mono',monospace">${d.m}</text>
+      <text x="${bx+bw/2}" y="${by-4}" text-anchor="middle" fill="rgba(249,115,22,.5)" font-size="8" font-family="'Share Tech Mono',monospace">${(d.v/1000).toFixed(0)}k</text>
+    `;
+  }).join('');
+}
+
+/* ══════════════════════════
+   FACILITIES
+══════════════════════════ */
+const FAC_DATA=[
+  {name:'Admin Block',    floors:4,area:'12,400 sqft',devices:148,load:82, max:120,status:'normal',  inspected:'12 Feb 2026',manager:'R. Sharma'},
+  {name:'Academic Wing',  floors:6,area:'28,000 sqft',devices:312,load:109,max:130,status:'warning', inspected:'05 Feb 2026',manager:'P. Mehta'},
+  {name:'Lab Complex',    floors:3,area:'9,800 sqft', devices:98, load:51, max:140,status:'normal',  inspected:'18 Feb 2026',manager:'K. Nair'},
+  {name:'Block-C / HVAC', floors:5,area:'19,500 sqft',devices:54, load:134,max:140,status:'critical',inspected:'01 Feb 2026',manager:'S. Verma'},
+  {name:'Sports Complex', floors:2,area:'8,200 sqft', devices:62, load:34, max:80, status:'normal',  inspected:'22 Feb 2026',manager:'A. Rao'},
+  {name:'Central Library',floors:3,area:'11,600 sqft',devices:88, load:47, max:90, status:'normal',  inspected:'10 Feb 2026',manager:'D. Iyer'},
+];
+function renderFacilities(){
+  const g=document.getElementById('facilities-grid'); if(!g) return;
+  g.innerHTML=FAC_DATA.map(b=>{
+    const sc=statusColor(b.status);
+    const pct=Math.round((b.load/b.max)*100);
+    return `
+    <div class="facility-card" style="border:1px solid ${sc}25;">
+      <div class="fac-header">
+        <div><div class="fac-name">${b.name}</div><div class="fac-info">${b.floors} floors · ${b.area}</div></div>
+        <span class="fac-badge" style="color:${sc};background:${sc}15;border-color:${sc}35;">${b.status.toUpperCase()}</span>
+      </div>
+      <div class="fac-grid">
+        <div class="fac-stat"><div class="fac-stat-k">LOAD</div><div class="fac-stat-v">${b.load} kWh</div></div>
+        <div class="fac-stat"><div class="fac-stat-k">DEVICES</div><div class="fac-stat-v">${b.devices}</div></div>
+        <div class="fac-stat"><div class="fac-stat-k">MANAGER</div><div class="fac-stat-v">${b.manager.split(' ')[0]}</div></div>
+      </div>
+      <div class="fac-util"><span>Load utilisation</span><span style="color:${sc};">${pct}%</span></div>
+      <div class="fac-bar"><div class="fac-fill" style="width:${pct}%;background:${sc};color:${sc};"></div></div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(255,255,255,.18);margin-top:.5rem;">Last inspected: ${b.inspected}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ══════════════════════════
+   FULL ALERTS TAB
+══════════════════════════ */
+const FULL_ALERTS=[
+  {type:'crit',msg:'Block-C HVAC drawing 18% above threshold',    time:'12:41',zone:'ZONE-C', action:'Reduce HVAC setpoint by 2°C'},
+  {type:'crit',msg:'Academic Wing circuit breaker near trip limit',time:'12:39',zone:'ZONE-A', action:'Redistribute load to Lab Complex'},
+  {type:'crit',msg:'Main transformer load approaching 85%',       time:'12:38',zone:'GRID',   action:'Shed non-critical loads in Admin Block'},
+  {type:'warn',msg:'Lab Wing UPS runtime below 20 min reserve',   time:'12:31',zone:'ZONE-B', action:'Initiate UPS battery health check'},
+  {type:'info',msg:'Solar Array-3 output reduced — cloud cover',  time:'12:20',zone:'SOLAR',  action:null},
+  {type:'ok',  msg:'Demand response event completed successfully', time:'11:55',zone:'GLOBAL', action:null},
+  {type:'warn',msg:'Power factor dropped to 0.91 on feeder-2',    time:'11:42',zone:'GRID',   action:'Check capacitor bank status'},
+];
+let currentFilter='all';
+function filterAlerts(f,btn){
+  currentFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFullAlerts();
+}
+function renderFullAlerts(){
+  const el=document.getElementById('alerts-list'); if(!el) return;
+  const filtered=currentFilter==='all'?FULL_ALERTS:FULL_ALERTS.filter(a=>a.type===currentFilter);
+  el.innerHTML=filtered.length===0
+    ?'<div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:rgba(255,255,255,.2);text-align:center;padding:2rem;">No alerts matching filter</div>'
+    :filtered.map((a,i)=>`
+    <div class="alert-full-item" style="animation:slideUp .3s ${i*0.04}s cubic-bezier(.16,1,.3,1) both;">
+      <div class="afi-bar" style="background:${typeColor(a.type)};"></div>
+      <div class="afi-body">
+        <div class="afi-head">
+          <span class="afi-tag" style="color:${typeColor(a.type)};border-color:${typeColor(a.type)}40;">${a.type.toUpperCase()}</span>
+          <span class="afi-zone">${a.zone}</span>
+          <span class="afi-time">${a.time}</span>
+        </div>
+        <div class="afi-msg">${a.msg}</div>
+        ${a.action?`<div class="afi-action">Suggested: ${a.action}</div>`:''}
+      </div>
+      <button class="afi-ack" onclick="this.style.color='#34d399';this.textContent='ACK✓'">ACK</button>
+    </div>`).join('');
+}
+
+/* ══════════════════════════
+   CHATBOT
+══════════════════════════ */
+const CHATBOT_RESPONSES={
+  most:()=>`The Classroom Block is currently using the most energy. During peak hours (10:00–16:00) it draws up to 1.8× its base load — this is primarily AC systems running in unoccupied rooms.`,
+  save:()=>`Fixing the 3 active alerts can save ₹895 per week — ₹46,540 annually. Biggest win: Classroom AC timers (₹480/week), then Computer Lab motion sensors (₹320/week).`,
+  alert:()=>`3 active alerts right now: (1) Block-C HVAC 18% over threshold — critical. (2) Academic Wing circuit breaker near limit — critical. (3) Transformer at 85% capacity — critical. Total savings potential: ₹895/week.`,
+  recommend:()=>`Top 3 actions: (1) Smart AC timers in Classrooms — ₹480/week. (2) Motion sensors in Computer Lab — ₹320/week. (3) Auto-off lights in Library — ₹95/week. Total: ₹895/week saved.`,
+  solar:()=>`Solar output today: 42.3 kW, yield: 214 kWh. Array-4 is critical at only 18% efficiency — needs immediate inspection. Arrays 1 & 2 are performing well at 92% and 88%. Recommend Array-4 maintenance scheduling.`,
+  hi:()=>`Hello! I'm monitoring ${STATE.load} kWh across 6 campus zones with 3 active waste alerts. The campus is currently at ${STATE.eff}% efficiency. What would you like to know?`,
+  grid:()=>`Grid status: Voltage 230.4V (nominal), Frequency ${STATE.gridFreq} Hz (stable). Power factor is 0.93 — slightly below the 0.95 target. Transformer is at 84% of 500 kVA capacity. Recommend capacitor bank inspection.`,
+  default:()=>`Current total load: ${STATE.load} kWh. 3 alerts active. Potential savings: ₹895/week (₹46,540/year). Try asking "which zone wastes most?" or "give me recommendations".`,
+};
+function getChatResponse(q){
+  q=q.toLowerCase();
+  if(/most|highest|worst|max/.test(q))        return CHATBOT_RESPONSES.most();
+  if(/save|saving|waste|money|cost|rs|rupee/.test(q)) return CHATBOT_RESPONSES.save();
+  if(/alert|warning|problem|urgent/.test(q))  return CHATBOT_RESPONSES.alert();
+  if(/recommend|suggest|tip|advice|should/.test(q)) return CHATBOT_RESPONSES.recommend();
+  if(/solar|array|pv/.test(q))               return CHATBOT_RESPONSES.solar();
+  if(/hello|hi|hey|help/.test(q))            return CHATBOT_RESPONSES.hi();
+  if(/grid|voltage|frequency|power factor/.test(q)) return CHATBOT_RESPONSES.grid();
+  return CHATBOT_RESPONSES.default();
+}
+function addChatMsg(text,type){
+  const el=document.getElementById('chat-messages');
+  const d=document.createElement('div');
+  d.className='chat-msg '+type;
+  if(type==='bot') d.innerHTML=`<div class="bot-name">ENERGY GUARDIAN AI</div>${text}`;
+  else d.textContent=text;
+  el.appendChild(d);
+  el.scrollTop=el.scrollHeight;
+}
+function sendChat(){
+  const inp=document.getElementById('chat-input');
+  const q=inp.value.trim(); if(!q) return;
+  addChatMsg(q,'user');
+  inp.value='';
+  setTimeout(()=>{
+    addChatMsg(getChatResponse(q),'bot');
+  },420);
+}
+function sendQuick(q){
+  document.getElementById('chat-input').value=q;
+  sendChat();
+}
+// Initial greeting
+setTimeout(()=>addChatMsg('Hello! I\'m monitoring the campus energy systems. I currently see '+FULL_ALERTS.filter(a=>a.type==='crit').length+' critical alerts and potential savings of ₹895/week. Ask me anything!','bot'),600);
+
+/* ══════════════════════════
+   TOGGLE SETTINGS
+══════════════════════════ */
+function toggleSetting(el){
+  el.classList.toggle('on');
+  el.classList.toggle('off');
+}
+
+/* ══════════════════════════
+   3D CAMPUS (Three.js — exact from friend's project)
+══════════════════════════ */
+const BLDGS3D={
+  Hostel_A:{label:"Hostel A",    bx:30,bz:5,  bw:70,bd:50,nf:3,fh:3.5,
+    floors:[{name:"Ground",rooms:[{n:"Room G01",rx:0,rz:0,rw:33,rd:24},{n:"Room G02",rx:35,rz:0,rw:34,rd:24},{n:"Corridor",rx:0,rz:25,rw:69,rd:4},{n:"Room G03",rx:0,rz:30,rw:33,rd:19},{n:"Room G04",rx:35,rz:30,rw:34,rd:19}]},
+    {name:"1st Floor",rooms:[{n:"Room 101",rx:0,rz:0,rw:33,rd:24},{n:"Room 102",rx:35,rz:0,rw:34,rd:24},{n:"Room 103",rx:0,rz:25,rw:33,rd:24},{n:"Room 104",rx:35,rz:25,rw:34,rd:24}]},
+    {name:"2nd Floor",rooms:[{n:"Room 201",rx:0,rz:0,rw:33,rd:24},{n:"Room 202",rx:35,rz:0,rw:34,rd:24},{n:"Room 203",rx:0,rz:25,rw:33,rd:24},{n:"Room 204",rx:35,rz:25,rw:34,rd:24}]}]},
+  Lab_1:{label:"Computer Lab",  bx:5,bz:61,bw:20,bd:22,nf:2,fh:3.5,
+    floors:[{name:"Ground",rooms:[{n:"Reception",rx:0,rz:0,rw:20,rd:10},{n:"Records",rx:0,rz:11,rw:20,rd:10}]},
+    {name:"1st Floor",rooms:[{n:"Director",rx:0,rz:0,rw:9,rd:10},{n:"Dep.Director",rx:11,rz:0,rw:9,rd:10},{n:"Accounts",rx:0,rz:11,rw:20,rd:10}]}]},
+  Hostel_B:{label:"Hostel B",   bx:5,bz:87,bw:20,bd:23,nf:2,fh:3.5,
+    floors:[{name:"Ground",rooms:[{n:"Dining Hall",rx:0,rz:0,rw:20,rd:12},{n:"Kitchen",rx:0,rz:13,rw:9,rd:9},{n:"Serving Area",rx:11,rz:13,rw:9,rd:9}]},
+    {name:"1st Floor",rooms:[{n:"Staff Canteen",rx:0,rz:0,rw:20,rd:12},{n:"Storage",rx:0,rz:13,rw:9,rd:9},{n:"Mgr Office",rx:11,rz:13,rw:9,rd:9}]}]},
+  Classroom_Block:{label:"Classrooms",bx:30,bz:61,bw:70,bd:50,nf:3,fh:4.0,
+    floors:[{name:"Ground",rooms:[{n:"Lecture Hall A",rx:0,rz:0,rw:33,rd:23},{n:"Lecture Hall B",rx:36,rz:0,rw:33,rd:23},{n:"Corridor",rx:0,rz:24,rw:69,rd:4},{n:"Lecture Hall C",rx:0,rz:29,rw:33,rd:20},{n:"Lecture Hall D",rx:36,rz:29,rw:33,rd:20}]},
+    {name:"1st Floor",rooms:[{n:"Seminar Hall",rx:0,rz:0,rw:69,rd:24},{n:"Staff Room",rx:0,rz:26,rw:33,rd:23},{n:"HOD Office",rx:36,rz:26,rw:33,rd:23}]},
+    {name:"2nd Floor",rooms:[{n:"Lecture Hall E",rx:0,rz:0,rw:33,rd:49},{n:"Lecture Hall F",rx:36,rz:0,rw:33,rd:49}]}]},
+  Library:{label:"Library",     bx:105,bz:61,bw:50,bd:50,nf:2,fh:4.0,
+    floors:[{name:"Ground",rooms:[{n:"Main Reading Hall",rx:0,rz:0,rw:49,rd:24},{n:"Reference Section",rx:0,rz:26,rw:23,rd:23},{n:"Digital Lab",rx:26,rz:26,rw:23,rd:23}]},
+    {name:"1st Floor",rooms:[{n:"Study Cubicles",rx:0,rz:0,rw:23,rd:49},{n:"Periodicals",rx:26,rz:0,rw:23,rd:23},{n:"Archive Room",rx:26,rz:26,rw:23,rd:23}]}]},
+  Admin_Block:{label:"Admin Block",bx:30,bz:117,bw:70,bd:17,nf:2,fh:3.8,
+    floors:[{name:"Ground",rooms:[{n:"Lab A — Workstations",rx:0,rz:0,rw:69,rd:7},{n:"Lab B — Workstations",rx:0,rz:9,rw:33,rd:7},{n:"Server Room",rx:36,rz:9,rw:33,rd:7}]},
+    {name:"1st Floor",rooms:[{n:"Lab C — Workstations",rx:0,rz:0,rw:69,rd:7},{n:"Lab D — Workstations",rx:0,rz:9,rw:33,rd:7},{n:"Storage / UPS",rx:36,rz:9,rw:33,rd:7}]}]},
+};
+
+let renderer3,scene3,camera3,BDATA3={},CLICKABLE3=[],SEL3='Classroom_Block',ALERTS3=new Set(),clock3=0;
+let drag3=false,rDrag3=false,pm3={x:0,y:0};
+let sph3={th:0.52,ph:0.62,r:420},tgt3;
+const R3={top:[0,5],h1:[55,61],h2:[111,117],bot:[135,140],left:[0,5],v1:[25,30],v2:[100,105],v3:[155,160],right:[175,180]};
+
+function eHex3(kwh){ if(kwh<0.5)return 0x22c55e; if(kwh<1.0)return 0x84cc16; if(kwh<1.5)return 0xfbbf24; if(kwh<2.0)return 0xf97316; return 0xef4444; }
+function eHexStr(kwh){ if(kwh<0.5)return '#22c55e'; if(kwh<1.0)return '#84cc16'; if(kwh<1.5)return '#fbbf24'; if(kwh<2.0)return '#f97316'; return '#ef4444'; }
+
+function initThreeJS(){
+  const canvas=document.getElementById('campus-canvas');
+  const wrap=document.getElementById('canvas-wrap');
+  renderer3=new THREE.WebGLRenderer({canvas,antialias:true});
+  renderer3.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer3.setSize(wrap.clientWidth,wrap.clientHeight);
+  renderer3.shadowMap.enabled=true;
+  renderer3.shadowMap.type=THREE.PCFSoftShadowMap;
+
+  scene3=new THREE.Scene();
+  scene3.background=new THREE.Color(0x0d1117);
+  scene3.fog=new THREE.Fog(0x0d1117,450,750);
+
+  camera3=new THREE.PerspectiveCamera(40,wrap.clientWidth/wrap.clientHeight,0.5,1000);
+  tgt3=new THREE.Vector3(90,0,90);
+
+  scene3.add(new THREE.AmbientLight(0xd0dcf0,0.8));
+  const sun=new THREE.DirectionalLight(0xfff4e0,1.0);
+  sun.position.set(90,200,140); sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.camera.left=-300; sun.shadow.camera.right=300;
+  sun.shadow.camera.top=300; sun.shadow.camera.bottom=-300; sun.shadow.camera.far=700;
+  scene3.add(sun);
+  const fill=new THREE.DirectionalLight(0x6080b0,0.25);
+  fill.position.set(-100,80,-80); scene3.add(fill);
+
+  camSync3();
+  buildScene3();
+  updateColors3D();
+  render3DPanel();
+  animate3();
+
+  // Mouse events
+  canvas.addEventListener('mousedown',e=>{drag3=true;rDrag3=e.button===2;pm3={x:e.clientX,y:e.clientY};wrap.classList.add('grabbing');});
+  canvas.addEventListener('contextmenu',e=>e.preventDefault());
+  window.addEventListener('mouseup',()=>{drag3=false;wrap.classList.remove('grabbing');});
+  window.addEventListener('mousemove',e=>{
+    if(!drag3)return;
+    const dx=e.clientX-pm3.x,dy=e.clientY-pm3.y;
+    pm3={x:e.clientX,y:e.clientY};
+    if(rDrag3){
+      const r=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),camera3.position.clone().sub(tgt3)).normalize();
+      tgt3.addScaledVector(r,dx*0.15); tgt3.y=Math.max(0,tgt3.y-dy*0.15);
+    }else{
+      sph3.th-=dx*0.004;
+      sph3.ph=Math.max(0.08,Math.min(1.38,sph3.ph-dy*0.004));
+    }
+    camSync3();
+  });
+  canvas.addEventListener('wheel',e=>{
+    sph3.r=Math.max(40,Math.min(700,sph3.r+e.deltaY*0.38));
+    camSync3(); e.preventDefault();
+  },{passive:false});
+
+  // Click
+  const RC=new THREE.Raycaster(),MV=new THREE.Vector2();
+  canvas.addEventListener('click',e=>{
+    const rect=canvas.getBoundingClientRect();
+    MV.set(((e.clientX-rect.left)/rect.width)*2-1,-(((e.clientY-rect.top)/rect.height)*2-1));
+    RC.setFromCamera(MV,camera3);
+    const h=RC.intersectObjects(CLICKABLE3);
+    if(h.length) selectZone3(h[0].object.userData.zk);
+  });
+
+  // Resize
+  window.addEventListener('resize',()=>{
+    const w=wrap.clientWidth,h=wrap.clientHeight;
+    camera3.aspect=w/h; camera3.updateProjectionMatrix();
+    renderer3.setSize(w,h);
+  });
+}
+
+function camSync3(){
+  camera3.position.set(
+    tgt3.x+sph3.r*Math.sin(sph3.ph)*Math.sin(sph3.th),
+    tgt3.y+sph3.r*Math.cos(sph3.ph),
+    tgt3.z+sph3.r*Math.sin(sph3.ph)*Math.cos(sph3.th)
+  );
+  camera3.lookAt(tgt3);
+}
+
+function addBox3(x,y,z,w,h,d,colorHex,cast=false,recv=true){
+  const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color:colorHex}));
+  mesh.position.set(x+w/2,y+h/2,z+d/2);
+  mesh.castShadow=cast; mesh.receiveShadow=recv;
+  scene3.add(mesh); return mesh;
+}
+
+function buildScene3(){
+  // Ground
+  addBox3(0,-0.6,0,180,0.6,140,0x2e5e28);
+  // Roads
+  const RC2=0x1c2535;
+  addBox3(0,0,R3.top[0],180,0.15,R3.top[1]-R3.top[0],RC2);
+  addBox3(0,0,R3.h1[0], 180,0.15,R3.h1[1]-R3.h1[0], RC2);
+  addBox3(0,0,R3.h2[0], 180,0.15,R3.h2[1]-R3.h2[0], RC2);
+  addBox3(0,0,R3.bot[0],180,0.15,R3.bot[1]-R3.bot[0],RC2);
+  addBox3(R3.left[0],0,0,R3.left[1]-R3.left[0],0.15,140,RC2);
+  addBox3(R3.v1[0],0,0,R3.v1[1]-R3.v1[0],0.15,140,RC2);
+  addBox3(R3.v2[0],0,0,R3.v2[1]-R3.v2[0],0.15,140,RC2);
+  addBox3(R3.v3[0],0,0,R3.v3[1]-R3.v3[0],0.15,140,RC2);
+  addBox3(R3.right[0],0,0,R3.right[1]-R3.right[0],0.15,140,RC2);
+  // Football field
+  addBox3(5,0,5,20,0.1,50,0x1e7a1e);
+  addBox3(5,0.11,5,20,0.03,0.5,0xffffff);
+  addBox3(5,0.11,54.5,20,0.03,0.5,0xffffff);
+  addBox3(5,0.11,29.75,20,0.03,0.5,0xffffff);
+  // Track
+  addBox3(105,0,117,50,0.1,17,0xaa2e20);
+  addBox3(113,0.11,119,34,0.08,13,0x1e7a1e);
+  // Parking
+  addBox3(160,0,117,15,0.1,17,0x242d3a);
+  // Buildings
+  Object.entries(BLDGS3D).forEach(([zk,b])=>buildBuilding3(zk,b));
+}
+
+function buildBuilding3(zk,b){
+  const {bx,bz,bw,bd,nf,fh,floors}=b;
+  const roomMeshes=[],shellMeshes=[];
+  floors.forEach((fl,fi)=>{
+    const baseY=fi*fh;
+    addBox3(bx,baseY,bz,bw,0.3,bd,0x888888);
+    const shell=new THREE.Mesh(new THREE.BoxGeometry(bw,fh-0.3,bd),new THREE.MeshLambertMaterial({color:0x888888}));
+    shell.position.set(bx+bw/2,baseY+0.3+(fh-0.3)/2,bz+bd/2);
+    shell.castShadow=true; shell.receiveShadow=true;
+    scene3.add(shell); shellMeshes.push(shell);
+    fl.rooms.forEach(rm=>{
+      const rh=fh-0.4;
+      const mesh=new THREE.Mesh(new THREE.BoxGeometry(rm.rw,rh,rm.rd),new THREE.MeshLambertMaterial({color:0x888888}));
+      mesh.position.set(bx+rm.rx+rm.rw/2,baseY+0.35+rh/2,bz+rm.rz+rm.rd/2);
+      mesh.castShadow=true; mesh.receiveShadow=true;
+      mesh.userData={zk,floor:fl.name,room:rm.n};
+      scene3.add(mesh); CLICKABLE3.push(mesh); roomMeshes.push(mesh);
+    });
+  });
+  const totalH=nf*fh;
+  const roofMat=new THREE.MeshLambertMaterial({color:0x888888});
+  const roofMesh=new THREE.Mesh(new THREE.BoxGeometry(bw,0.6,bd),roofMat);
+  roofMesh.position.set(bx+bw/2,totalH+0.3,bz+bd/2);
+  roofMesh.castShadow=true; scene3.add(roofMesh);
+  // Label
+  scene3.add(makeBldLabel3(b.label,bx+bw/2,totalH+4.5,bz+bd/2));
+  BDATA3[zk]={roofMesh,roomMeshes,shellMeshes,b};
+}
+
+function makeBldLabel3(name,x,y,z){
+  const c=document.createElement('canvas'); c.width=400; c.height=60;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='rgba(3,7,18,0.92)'; ctx.roundRect(2,2,396,56,10); ctx.fill();
+  ctx.strokeStyle='rgba(249,115,22,0.6)'; ctx.lineWidth=2; ctx.roundRect(2,2,396,56,10); ctx.stroke();
+  ctx.fillStyle='#f9fafb'; ctx.font='bold 26px Segoe UI'; ctx.textAlign='center'; ctx.fillText(name,200,38);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));
+  sp.scale.set(36,5.4,1); sp.position.set(x,y,z);
+  return sp;
+}
+
+function updateColors3D(){
+  Object.entries(BDATA3).forEach(([zk,bd])=>{
+    const kwh=ENERGY[zk]||0;
+    const isSel=zk===SEL3,isAlrt=ALERTS3.has(zk);
+    const ec=eHex3(kwh);
+    bd.roofMesh.material.color.setHex(ec);
+    bd.roofMesh.material.emissive.setHex(isSel?0xf97316:isAlrt?0xef4444:0x000000);
+    bd.roofMesh.material.emissiveIntensity=(isSel||isAlrt)?0.4:0;
+    bd.roomMeshes.forEach(rm=>{
+      rm.material.color.setHex(ec);
+      rm.material.emissive.setHex(isSel?0xf97316:isAlrt?0xef4444:0x000000);
+      rm.material.emissiveIntensity=(isSel||isAlrt)?0.3:0;
+    });
+    if(bd.shellMeshes) bd.shellMeshes.forEach(sh=>{
+      sh.material.color.setHex(ec);
+      sh.material.emissive.setHex(isSel?0xf97316:isAlrt?0xef4444:0x000000);
+      sh.material.emissiveIntensity=(isSel||isAlrt)?0.3:0;
+    });
+  });
+}
+
+function selectZone3(zk){
+  SEL3=zk; updateColors3D(); render3DPanel();
+  const b=BLDGS3D[zk]; if(!b) return;
+  tgt3.set(b.bx+b.bw/2,b.nf*b.fh*0.4,b.bz+b.bd/2);
+  sph3.r=Math.max(90,Math.max(b.bw,b.bd)*2.5);
+  camSync3();
+  const kwh=ENERGY[zk]||0;
+  const rooms=b.floors.reduce((a,f)=>a+f.rooms.length,0);
+  document.getElementById('tt-name').textContent=b.label;
+  document.getElementById('tt-kwh').textContent=kwh.toFixed(2)+' kWh  ·  '+(ALERTS3.has(zk)?'⚠ ALERT ACTIVE':'Normal');
+  document.getElementById('tt-info').textContent=
+    b.nf+' floor(s) · '+rooms+' rooms\n'+
+    b.floors.map(f=>f.name+': '+f.rooms.map(r=>r.n).join(' · ')).join('\n');
+  document.getElementById('bldg-tooltip').style.display='block';
+}
+
+function render3DPanel(){
+  const list=document.getElementById('zlist'); if(!list) return;
+  list.innerHTML=''; let tot=0,alc=0;
+  Object.entries(BLDGS3D).forEach(([zk,b])=>{
+    const kwh=ENERGY[zk]||0; tot+=kwh;
+    if(ALERTS3.has(zk)) alc++;
+    const col=eHexStr(kwh);
+    const d=document.createElement('div');
+    d.className='zp-row'+(zk===SEL3?' sel':'')+(ALERTS3.has(zk)?' alrt':'');
+    d.innerHTML=`<span class="zp-name">${b.label}</span><span class="zp-kwh" style="color:${col};">${kwh.toFixed(2)} kWh</span>`;
+    d.onclick=()=>selectZone3(zk);
+    list.appendChild(d);
+  });
+  const totEl=document.getElementById('s-tot'); if(totEl) totEl.textContent=tot.toFixed(2)+' kWh';
+  const alcEl=document.getElementById('s-alc'); if(alcEl) alcEl.textContent=alc+' Active';
+  const tsEl=document.getElementById('s-ts'); if(tsEl) tsEl.textContent='Updated '+new Date().toTimeString().slice(0,8);
+}
+
+function animate3(){
+  requestAnimationFrame(animate3);
+  clock3+=0.016;
+  ALERTS3.forEach(zk=>{
+    const bd=BDATA3[zk]; if(!bd) return;
+    bd.roofMesh.material.emissiveIntensity=zk===SEL3?0.5:0.15+0.2*Math.sin(clock3*3.8);
+  });
+  renderer3.render(scene3,camera3);
+}
+
+/* ══════════════════════════
+   3D PANEL for overview tab
+══════════════════════════ */
+function simAlertsFrom3D(){
+  const h=new Date().getHours();
+  ALERTS3=new Set();
+  if(ENERGY.Lab_1>1.2&&h>=22)           ALERTS3.add('Lab_1');
+  if(ENERGY.Classroom_Block>1.0&&h>=20) ALERTS3.add('Classroom_Block');
+  if(ENERGY.Hostel_B>1.0&&h>=20)        ALERTS3.add('Hostel_B');
+}
+
+/* ══════════════════════════
+   BOOT
+══════════════════════════ */
+renderFacilities();
+renderAlertLog();
+renderFullAlerts();
+renderZoneGrid();
+renderWeeklyChart();
+renderDemandChart();
+
+setTimeout(()=>{
+  simAlertsFrom3D();
+  tick();
+  setInterval(()=>{ simAlertsFrom3D(); tick(); },5000);
+},300);
+
+// Pre-init charts
+setTimeout(()=>{
+  drawVoltageChart();
+  drawFreqChart();
+  drawSolarChart();
+  drawMonthlyChart();
+},400);
+</script>
+</body>
+</html>
