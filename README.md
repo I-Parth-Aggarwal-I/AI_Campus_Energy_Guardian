@@ -31,8 +31,6 @@
 | 3D Rendering | [Three.js r128](https://threejs.org/)            |
 | Fonts        | Google Fonts (Rajdhani, Share Tech Mono, Cinzel) |
 | Charts       | Canvas API (custom)                              |
-| Backend / AI | _(add your stack here)_                          |
-
 
 ---
 
