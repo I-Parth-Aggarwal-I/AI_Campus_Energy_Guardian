@@ -1,4 +1,3 @@
-# AI_Campus_Energy_Guardian
 # ⚡ Energy Guardian — AI Campus Energy Monitoring
 
 > Real-time AI-powered energy monitoring dashboard for campus facilities.
