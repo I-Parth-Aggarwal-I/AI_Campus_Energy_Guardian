@@ -59,7 +59,8 @@ energy-guardian/
 ```
 ## 📸 Screenshots
 
-> 
+> <img width="1919" height="898" alt="image" src="https://github.com/user-attachments/assets/e4595739-cbc0-4e75-9ac9-b3a507b576f5" />
+
 
 ---
 
