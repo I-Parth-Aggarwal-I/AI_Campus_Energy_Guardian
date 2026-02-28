@@ -103,10 +103,10 @@ That's it. No `npm install`. No server. Just open and go.
 
 | | |
 |--|--|
-| **Team Name** | *(Pixel Pioneers)* |
-| **Team Leader** | *(Parth Aggarwal)* |
-| **Member** | *(Aryan Bansal)* |
-| **Member** | *(Kundan Sahil)* |
+| **Team Name** | Pixel Pioneers |
+| **Team Leader** | Parth Aggarwal |
+| **Member** | Aryan Bansal |
+| **Member** | Kundan Sahil |
 | **Problem Statement** | Educational campuses experience significant energy inefficiencies due to the absence of real-time monitoring, predictive insights, and cost-effective optimization tools.|
 
 ---
