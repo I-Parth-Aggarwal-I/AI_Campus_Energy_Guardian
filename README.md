@@ -39,9 +39,9 @@ No more flying blind. No more surprise electricity bills.
 - **Frontend:** HTML5, CSS3, Vanilla JavaScript (zero framework dependencies)
 - **3D Rendering:** [Three.js r128](https://threejs.org/) — WebGL campus visualization
 - **Fonts:** Google Fonts — Rajdhani, Share Tech Mono, Cinzel
-- **AI Integration:** *(your AI/ML stack here)*
-- **AMD Products:** *(list AMD hardware/software used)*
-- **Data Layer:** *(your database/streaming stack)*
+- **AI Integration:** Bell-curve demand modelling, ONNX Runtime, Anthropic Claude API (chatbot)
+- **AMD Products:** AMD Ryzen AI PC, Radeon GPU (DirectML), NPU (VitisAI / ONNX Runtime)
+- **Data Layer:** Local JSON, SQLite, ReportLab (PDF), 5-second live refresh cycle
 
 ---
 
@@ -107,7 +107,7 @@ That's it. No `npm install`. No server. Just open and go.
 | **Team Leader** | *(Parth Aggarwal)* |
 | **Member** | *(Aryan Bansal)* |
 | **Member** | *(Kundan Sahil)* |
-| **Problem Statement** | *(paste here)* |
+| **Problem Statement** | Educational campuses experience significant energy inefficiencies due to the absence of real-time monitoring, predictive insights, and cost-effective optimization tools.|
 
 ---
 
