@@ -95,8 +95,8 @@ That's it. No `npm install`. No server. Just open and go.
 
 ## 🎥 Demo
 
-> *[Demo Video Link - ](https://youtu.be/-DBfs5aHK_8)https://youtu.be/-DBfs5aHK_8*
-> *[Prototype Link - ](https://i-parth-aggarwal-i.github.io/AI_Campus_Energy_Guardian/)https://i-parth-aggarwal-i.github.io/AI_Campus_Energy_Guardian/*
+- *[Demo Video Link - ](https://youtu.be/-DBfs5aHK_8)https://youtu.be/-DBfs5aHK_8*
+- *[Prototype Link - ](https://i-parth-aggarwal-i.github.io/AI_Campus_Energy_Guardian/)https://i-parth-aggarwal-i.github.io/AI_Campus_Energy_Guardian/*
 
 ---
 
