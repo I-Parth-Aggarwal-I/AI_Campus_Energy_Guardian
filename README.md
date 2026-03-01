@@ -95,7 +95,7 @@ That's it. No `npm install`. No server. Just open and go.
 
 ## 🎥 Demo
 
-> 📹 [Demo Video Link — max 3 minutes](#) *([add your link here](https://youtu.be/-DBfs5aHK_8))*
+> 📹 *([Demo Video Link](#) (https://youtu.be/-DBfs5aHK_8))*
 
 ---
 
